@@ -81,6 +81,12 @@ section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] 
 }
 
 /* ---- Responsive / Mobile ---- */
+</style>
+""", unsafe_allow_html=True)
+
+# Responsive CSS in separate block to avoid truncation
+st.markdown("""
+<style>
 @media (max-width: 768px) {
     .main-header {
         padding: 1.5rem 1rem;
