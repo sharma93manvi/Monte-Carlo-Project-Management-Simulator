@@ -24,6 +24,7 @@ st.set_page_config(
 
 # --- Custom CSS ---
 st.markdown("""
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 html, body, [class*="st-"] { font-family: 'Inter', sans-serif; }
@@ -77,6 +78,72 @@ section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] 
 section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] span {
     white-space: normal !important;
     line-height: 1.4 !important;
+}
+
+/* ---- Responsive / Mobile ---- */
+@media (max-width: 768px) {
+    .main-header {
+        padding: 1.5rem 1rem;
+        border-radius: 10px;
+    }
+    .main-header h1 {
+        font-size: 1.5rem;
+    }
+    .main-header p {
+        font-size: 0.85rem;
+    }
+    .metric-card {
+        padding: 1rem 0.8rem;
+        margin-bottom: 0.6rem;
+    }
+    .metric-card .metric-value {
+        font-size: 1.4rem;
+    }
+    .metric-card .metric-label {
+        font-size: 0.7rem;
+    }
+    .section-header {
+        font-size: 1.15rem;
+    }
+    .insight-box {
+        padding: 0.75rem 0.9rem;
+        font-size: 0.85rem;
+    }
+    /* Stack metric columns vertically on mobile */
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+        min-width: 48% !important;
+        flex: 1 1 48% !important;
+        margin-bottom: 0.5rem;
+    }
+    /* Make charts scroll horizontally if needed */
+    div[data-testid="stImage"], .stPlotlyChart, div[data-testid="stPyplot"] {
+        overflow-x: auto !important;
+    }
+    /* Smaller button text on mobile */
+    div.stButton > button[kind="primary"] {
+        font-size: 1rem;
+        padding: 0.7rem 1rem;
+    }
+    /* Data editor / tables scroll */
+    div[data-testid="stDataFrame"] {
+        overflow-x: auto !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-header h1 {
+        font-size: 1.25rem;
+    }
+    .metric-card .metric-value {
+        font-size: 1.2rem;
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -503,10 +570,11 @@ def draw_network_graph(df, act_info, topo, criticality_pct=None):
 
 
 def dark_fig(figsize=(12, 5)):
-    fig, ax = plt.subplots(figsize=figsize)
+    # Use slightly narrower default that works better on mobile
+    fig, ax = plt.subplots(figsize=figsize, dpi=100)
     fig.patch.set_facecolor('#0e1117')
     ax.set_facecolor('#0e1117')
-    ax.tick_params(colors='white')
+    ax.tick_params(colors='white', labelsize=9)
     for spine in ['bottom', 'left']:
         ax.spines[spine].set_color('#555')
     for spine in ['top', 'right']:
