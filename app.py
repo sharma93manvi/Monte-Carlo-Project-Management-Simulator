@@ -159,8 +159,9 @@ with tab_upload:
     st.markdown("Upload a CSV or Excel file with columns: `Label`, `Activity`, `Predecessors`, "
                 "`Min Duration`, `Avg Duration`, `Max Duration`")
     st.markdown("")
-    uploaded_file = st.file_uploader("Select your project file", type=["csv", "xlsx", "xls"],
-                                     label_visibility="visible")
+    st.markdown("**Select your project file (.csv, .xlsx, .xls):**")
+    uploaded_file = st.file_uploader("Upload file", type=["csv", "xlsx", "xls"],
+                                     label_visibility="collapsed")
     if uploaded_file is not None:
         try:
             if uploaded_file.name.endswith('.csv'):
