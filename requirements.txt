@@ -1,5 +1,6 @@
-streamlit
+streamlit>=1.56.0
 numpy
 pandas
 matplotlib
 scipy
+openpyxl
