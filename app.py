@@ -216,7 +216,7 @@ with tab_edit:
     if 'df' not in st.session_state:
         st.session_state.df = pd.DataFrame(DEFAULT_DATA)
     edited_df = st.data_editor(
-        st.session_state.df, num_rows="dynamic", use_container_width=True, key="activity_table",
+        st.session_state.df, num_rows="dynamic", width='stretch', key="activity_table",
         column_config={
             "Label": st.column_config.TextColumn("Label", width="small"),
             "Activity": st.column_config.TextColumn("Activity Name", width="medium"),
@@ -247,7 +247,7 @@ with tab_upload:
                 st.session_state.df = upload_df[list(required_cols)].copy()
                 edited_df = st.session_state.df
                 st.success(f"Loaded {len(upload_df)} activities from {uploaded_file.name}")
-                st.dataframe(upload_df, use_container_width=True, hide_index=True)
+                st.dataframe(upload_df, width='stretch', hide_index=True)
             else:
                 missing = required_cols - set(upload_df.columns)
                 st.error(f"Missing columns: {', '.join(missing)}")
@@ -259,8 +259,8 @@ with tab_template:
     template_df = pd.DataFrame(DEFAULT_DATA)
     csv_buffer = template_df.to_csv(index=False)
     st.download_button(label="Download CSV Template", data=csv_buffer,
-                       file_name="project_template.csv", mime="text/csv", use_container_width=True)
-    st.dataframe(template_df, use_container_width=True, hide_index=True)
+                       file_name="project_template.csv", mime="text/csv", width='stretch')
+    st.dataframe(template_df, width='stretch', hide_index=True)
 
 # ============================================================
 # HELPER FUNCTIONS
@@ -664,7 +664,7 @@ def draw_gantt(topo, act_info, schedule, name_map, criticality_pct=None):
 st.markdown("---")
 run_col1, run_col2, run_col3 = st.columns([1, 3, 1])
 with run_col2:
-    run_button = st.button("Run Monte Carlo Simulation", type="primary", use_container_width=True)
+    run_button = st.button("Run Monte Carlo Simulation", type="primary", width='stretch')
 
 if run_button:
     errors = validate_data(edited_df)
@@ -776,7 +776,7 @@ if run_button:
                 f'{service_level}% Completion (wks)': [f"{pert_service_level:.2f}", f"{p_service:.2f}"],
                 'Critical Path Std Dev (wks)': [f"{pert_cp_std:.2f}", f"{std_dur:.2f}"],
             })
-            st.dataframe(comp_df, use_container_width=True, hide_index=True)
+            st.dataframe(comp_df, width='stretch', hide_index=True)
 
             # Critical path display
             cp_str = " -> ".join([f"{l} ({name_map.get(l, l)})" for l in cp])
@@ -803,7 +803,7 @@ if run_button:
                     'Float': f"{schedule['slack'][lbl]:.2f}",
                     'Critical': 'Yes' if lbl in cp else '',
                 })
-            st.dataframe(pd.DataFrame(sched_rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(sched_rows), width='stretch', hide_index=True)
 
             # ============================================================
             # NETWORK GRAPH — colored by criticality
@@ -1013,7 +1013,7 @@ if run_button:
                 'Completion (wks)': [f"{np.percentile(project_durations, p):.1f}" for p in pcts],
                 'Buffer above baseline (wks)': [f"{b:.1f}" for b in buffers],
             })
-            st.dataframe(buf_df, use_container_width=True, hide_index=True)
+            st.dataframe(buf_df, width='stretch', hide_index=True)
 
             # ============================================================
             # COMPLETION PROBABILITY LOOKUP
@@ -1052,7 +1052,7 @@ if run_button:
             pct_rows = [{'Service Level': f"{p}%",
                          'Completion Time (wks)': f"{np.percentile(project_durations, p):.1f}"}
                         for p in [50, 60, 70, 75, 80, 85, 90, 95, 97, 99]]
-            st.dataframe(pd.DataFrame(pct_rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(pct_rows), width='stretch', hide_index=True)
 
             # ============================================================
             # ACTIVITY RISK PROFILE
@@ -1083,7 +1083,7 @@ if run_button:
                     'Criticality (%)': f"{crit:.1f}",
                     'Risk Rating': rating,
                 })
-            st.dataframe(pd.DataFrame(risk_rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(risk_rows), width='stretch', hide_index=True)
 
             # ============================================================
             # SUMMARY STATISTICS
@@ -1102,7 +1102,7 @@ if run_button:
                     f"{np.max(project_durations):.2f}",
                 ]
             })
-            st.dataframe(stats_df, use_container_width=True, hide_index=True)
+            st.dataframe(stats_df, width='stretch', hide_index=True)
 
             # ============================================================
             # PER-ACTIVITY STATS
@@ -1118,7 +1118,7 @@ if run_button:
                     'Min Sampled': f"{np.min(d):.2f}", 'Max Sampled': f"{np.max(d):.2f}",
                     'Criticality': f"{crit_pct[label]:.1f}%",
                 })
-            st.dataframe(pd.DataFrame(act_stats), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(act_stats), width='stretch', hide_index=True)
 
             # ============================================================
             # EXPORT RESULTS
@@ -1129,7 +1129,7 @@ if run_button:
                 raw_csv = pd.DataFrame({'Simulated Duration (weeks)': project_durations}).to_csv(index=False)
                 st.download_button("Download Raw Simulation Data (CSV)", data=raw_csv,
                                    file_name="simulation_raw_output.csv", mime="text/csv",
-                                   use_container_width=True)
+                                   width='stretch')
             with exp2:
                 summary_export = pd.DataFrame([
                     {'Metric': 'Distribution', 'Value': dist_type},
@@ -1147,7 +1147,7 @@ if run_button:
                 summary_csv = summary_export.to_csv(index=False)
                 st.download_button("Download Summary Statistics (CSV)", data=summary_csv,
                                    file_name="simulation_summary.csv", mime="text/csv",
-                                   use_container_width=True)
+                                   width='stretch')
 
             # ============================================================
             # COMPLETION
