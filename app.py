@@ -63,6 +63,21 @@ div[data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
 div.stButton > button[kind="primary"] {
     font-size: 1.25rem; padding: 0.85rem 2rem; letter-spacing: 0.5px;
 }
+/* Fix file uploader button text overlap */
+section[data-testid="stFileUploader"] label {
+    font-size: 1rem !important;
+    margin-bottom: 0.5rem !important;
+}
+section[data-testid="stFileUploader"] button {
+    margin-top: 0.25rem !important;
+}
+section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
+    padding: 1rem !important;
+}
+section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] span {
+    white-space: normal !important;
+    line-height: 1.4 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
