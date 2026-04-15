@@ -1,7 +1,8 @@
 """
 Monte Carlo Project Simulator
 A flexible, visually rich Streamlit app for project management simulation.
-Supports multiple probability distributions, CSV upload, sensitivity analysis, network graph, and more.
+Supports multiple probability distributions, CSV upload, sensitivity analysis,
+network graph, Gantt chart, PERT comparison, buffer analysis, and more.
 """
 import streamlit as st
 import numpy as np
@@ -10,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.ticker as mticker
 from collections import defaultdict
+from scipy import stats as sp_stats
 import io
 
 # --- Page Config ---
@@ -58,6 +60,9 @@ html, body, [class*="st-"] { font-family: 'Inter', sans-serif; }
     border-radius: 10px; padding: 1rem; margin: 0.5rem 0; font-size: 0.9rem;
 }
 div[data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
+div.stButton > button[kind="primary"] {
+    font-size: 1.25rem; padding: 0.85rem 2rem; letter-spacing: 0.5px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -81,15 +86,17 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("## Distribution Type")
 dist_type = st.sidebar.selectbox(
     "Choose probability distribution",
-    ["Triangular", "PERT (Beta)", "Uniform", "Normal (truncated)"],
+    ["Triangular", "PERT (Beta)", "Uniform", "Normal (truncated)", "Lognormal"],
     help="Triangular uses min/mode/max. PERT gives more weight to the mode. "
-         "Uniform treats all values equally. Normal uses avg as mean and derives std from range."
+         "Uniform treats all values equally. Normal uses avg as mean. "
+         "Lognormal is right-skewed, good for approvals/procurement."
 )
 DIST_DESCRIPTIONS = {
     "Triangular": "Uses min, mode (most likely), and max. Good default when you have three-point estimates.",
     "PERT (Beta)": "A Beta distribution weighted toward the mode (lambda=4). Gives less probability to extremes than Triangular. Widely used in project management.",
     "Uniform": "Every value between min and max is equally likely. Use when you have no idea about the most likely value.",
     "Normal (truncated)": "Bell curve centered on the average, truncated at min/max. Std dev = (max-min)/6. Use when durations cluster tightly around the mean.",
+    "Lognormal": "Right-skewed distribution. Mean approx mode; spread from (max-min)/6. Good for activities like approvals or procurement that can have long tails.",
 }
 st.sidebar.markdown(f'<div class="dist-info"><b>{dist_type}</b><br>{DIST_DESCRIPTIONS[dist_type]}</div>',
                     unsafe_allow_html=True)
@@ -171,12 +178,8 @@ with tab_template:
 def validate_data(df):
     """Comprehensive validation with clear error messages."""
     errors = []
-
-    # Check for empty table
     if df is None or len(df) == 0:
         return ["The activity table is empty. Please add at least one activity."]
-
-    # Check required columns exist
     required_cols = {'Label', 'Activity', 'Predecessors', 'Min Duration', 'Avg Duration', 'Max Duration'}
     missing_cols = required_cols - set(df.columns)
     if missing_cols:
@@ -185,26 +188,17 @@ def validate_data(df):
     labels = []
     for idx, row in df.iterrows():
         label = str(row.get('Label', '')).strip()
-
-        # Empty / NaN label
-        if not label or label == 'nan' or label == '':
+        if not label or label == 'nan':
             errors.append(f"Row {idx + 1}: Activity label is empty.")
             continue
-
         labels.append(label)
-
-        # Empty activity name (warning, not blocking)
         act_name = str(row.get('Activity', '')).strip()
         if not act_name or act_name == 'nan':
             errors.append(f"Activity '{label}': Activity name is empty.")
-
-        # Check for NaN / missing durations
         for col in ['Min Duration', 'Avg Duration', 'Max Duration']:
             val = row.get(col)
             if val is None or (isinstance(val, float) and np.isnan(val)):
                 errors.append(f"Activity '{label}': {col} is missing.")
-
-        # Check numeric and non-negative
         try:
             lo = float(row['Min Duration'])
             avg = float(row['Avg Duration'])
@@ -212,7 +206,6 @@ def validate_data(df):
         except (ValueError, TypeError):
             errors.append(f"Activity '{label}': Duration values must be numbers.")
             continue
-
         if lo < 0 or avg < 0 or hi < 0:
             errors.append(f"Activity '{label}': Durations cannot be negative.")
         if lo > avg:
@@ -221,11 +214,9 @@ def validate_data(df):
             errors.append(f"Activity '{label}': Avg duration ({avg}) > Max duration ({hi}).")
         if lo > hi:
             errors.append(f"Activity '{label}': Min duration ({lo}) > Max duration ({hi}).")
-        # Zero-range check for distributions that need spread
-        if lo == hi and lo == avg and lo == 0:
+        if lo == hi == avg == 0:
             errors.append(f"Activity '{label}': All durations are zero.")
 
-    # Duplicate labels
     seen = set()
     for l in labels:
         if l in seen:
@@ -233,8 +224,6 @@ def validate_data(df):
         seen.add(l)
 
     label_set = set(labels)
-
-    # Predecessor validation
     for _, row in df.iterrows():
         label = str(row.get('Label', '')).strip()
         if not label or label == 'nan':
@@ -248,11 +237,10 @@ def validate_data(df):
                 errors.append(f"Activity '{label}': Cannot be its own predecessor (self-loop).")
             elif p not in label_set:
                 errors.append(f"Activity '{label}': Predecessor '{p}' does not exist in the table.")
-
     return errors
 
 
-def topological_sort(df):
+def topo_sort(df):
     """Kahn's algorithm. Returns ordered list or None if cycle detected."""
     labels = [str(row['Label']).strip() for _, row in df.iterrows()]
     preds_map = {}
@@ -261,13 +249,11 @@ def topological_sort(df):
         raw = str(row.get('Predecessors', '')).strip()
         preds = [p.strip() for p in raw.split(',') if p.strip() and p.strip() != 'nan']
         preds_map[label] = preds
-
     in_degree = {l: len(preds_map[l]) for l in labels}
     successors = defaultdict(list)
     for l in labels:
         for p in preds_map[l]:
             successors[p].append(l)
-
     queue = sorted([l for l in labels if in_degree[l] == 0])
     order = []
     while queue:
@@ -283,10 +269,7 @@ def topological_sort(df):
 
 def sample_duration(rng, dist_type, lo, mode, hi):
     """Sample a single activity duration from the chosen distribution."""
-    # Handle degenerate case: all three equal
     if lo == hi:
-        return lo
-    if lo == mode == hi:
         return lo
 
     if dist_type == "Triangular":
@@ -295,7 +278,6 @@ def sample_duration(rng, dist_type, lo, mode, hi):
     elif dist_type == "PERT (Beta)":
         lam = 4
         mu = (lo + lam * mode + hi) / (lam + 2)
-        # Clamp mu to avoid edge issues
         mu = max(lo + 1e-9, min(hi - 1e-9, mu))
         alpha_num = (mu - lo) * (2 * mode - lo - hi)
         alpha_den = (mode - mu) * (hi - lo)
@@ -322,9 +304,28 @@ def sample_duration(rng, dist_type, lo, mode, hi):
             val = rng.normal(mu, sigma)
             if lo <= val <= hi:
                 return val
-        return mu  # fallback
+        return mu
+
+    elif dist_type == "Lognormal":
+        mu_ = max(mode, 1e-6)
+        std = (hi - lo) / 6.0
+        if std <= 0:
+            return mode
+        sig2 = np.log(1 + (std / mu_) ** 2)
+        val = rng.lognormal(np.log(mu_) - sig2 / 2, np.sqrt(sig2))
+        return np.clip(val, lo, hi)
 
     return rng.triangular(lo, mode, hi)
+
+
+def pert_mean(lo, mode, hi):
+    """PERT analytical mean: (a + 4m + b) / 6"""
+    return (lo + 4 * mode + hi) / 6.0
+
+
+def pert_variance(lo, hi):
+    """PERT analytical variance: ((b - a) / 6)^2"""
+    return ((hi - lo) / 6.0) ** 2
 
 
 def run_simulation(topo, act_info, rng, dist_type, n_sim):
@@ -333,7 +334,6 @@ def run_simulation(topo, act_info, rng, dist_type, n_sim):
     activity_durations = {label: np.zeros(n_sim) for label in topo}
     activity_on_critical = {label: 0 for label in topo}
 
-    # Pre-build successors
     succs = defaultdict(list)
     for label in topo:
         for p in act_info[label]['preds']:
@@ -347,7 +347,6 @@ def run_simulation(topo, act_info, rng, dist_type, n_sim):
             durations[label] = d
             activity_durations[label][i] = d
 
-        # Forward pass
         ES, EF = {}, {}
         for label in topo:
             preds = act_info[label]['preds']
@@ -357,7 +356,6 @@ def run_simulation(topo, act_info, rng, dist_type, n_sim):
         proj_dur = max(EF.values())
         project_durations[i] = proj_dur
 
-        # Backward pass
         LF, LS = {}, {}
         for label in reversed(topo):
             if not succs[label]:
@@ -366,7 +364,6 @@ def run_simulation(topo, act_info, rng, dist_type, n_sim):
                 LF[label] = min(LS[s] for s in succs[label])
             LS[label] = LF[label] - durations[label]
 
-        # Criticality
         for label in topo:
             if abs(LS[label] - ES[label]) < 1e-9:
                 activity_on_critical[label] += 1
@@ -374,20 +371,48 @@ def run_simulation(topo, act_info, rng, dist_type, n_sim):
     return project_durations, activity_durations, activity_on_critical
 
 
-def draw_network_graph(df, act_info, topo, criticality_pct=None):
-    """Draw a project network diagram using matplotlib (no networkx needed).
-    Uses a layered layout based on topological depth."""
+def compute_deterministic_schedule(topo, act_info):
+    """Forward + backward pass using PERT mean durations. Returns schedule dict."""
+    mean_dur = {l: pert_mean(act_info[l]['min'], act_info[l]['avg'], act_info[l]['max']) for l in topo}
 
-    # Compute depth (longest path from start) for layering
+    succs = defaultdict(list)
+    for label in topo:
+        for p in act_info[label]['preds']:
+            succs[p].append(label)
+
+    ES, EF = {}, {}
+    for label in topo:
+        preds = act_info[label]['preds']
+        ES[label] = max((EF[p] for p in preds), default=0)
+        EF[label] = ES[label] + mean_dur[label]
+
+    pf = max(EF.values())
+
+    LF, LS = {}, {}
+    for label in reversed(topo):
+        if not succs[label]:
+            LF[label] = pf
+        else:
+            LF[label] = min(LS[s] for s in succs[label])
+        LS[label] = LF[label] - mean_dur[label]
+
+    slack = {l: round(LS[l] - ES[l], 6) for l in topo}
+    critical = [l for l in topo if slack[l] < 1e-6]
+
+    return {
+        'ES': ES, 'EF': EF, 'LS': LS, 'LF': LF,
+        'mean_dur': mean_dur, 'slack': slack,
+        'critical': critical, 'project_finish': pf, 'succs': succs,
+    }
+
+
+def draw_network_graph(df, act_info, topo, criticality_pct=None):
+    """Draw a project network diagram using matplotlib."""
     depth = {}
     for label in topo:
         preds = act_info[label]['preds']
-        if not preds:
-            depth[label] = 0
-        else:
-            depth[label] = max(depth[p] for p in preds) + 1
+        depth[label] = 0 if not preds else max(depth[p] for p in preds) + 1
 
-    # Group by depth
     layers = defaultdict(list)
     for label in topo:
         layers[depth[label]].append(label)
@@ -395,67 +420,50 @@ def draw_network_graph(df, act_info, topo, criticality_pct=None):
     max_depth = max(depth.values()) if depth else 0
     max_layer_size = max(len(v) for v in layers.values()) if layers else 1
 
-    # Assign positions
     pos = {}
     for d in range(max_depth + 1):
-        nodes_in_layer = layers[d]
-        n = len(nodes_in_layer)
-        for i, label in enumerate(nodes_in_layer):
-            x = d * 2.5
-            y = (i - (n - 1) / 2.0) * 2.0
-            pos[label] = (x, y)
+        nodes = layers[d]
+        n = len(nodes)
+        for i, label in enumerate(nodes):
+            pos[label] = (d * 2.5, (i - (n - 1) / 2.0) * 2.0)
 
-    # Build name lookup
-    name_map = {}
-    for _, row in df.iterrows():
-        name_map[str(row['Label']).strip()] = str(row['Activity']).strip()
+    name_map = {str(row['Label']).strip(): str(row['Activity']).strip() for _, row in df.iterrows()}
 
-    fig_width = max(8, (max_depth + 1) * 3)
-    fig_height = max(4, max_layer_size * 2)
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    fig_w = max(8, (max_depth + 1) * 3)
+    fig_h = max(4, max_layer_size * 2)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     fig.patch.set_facecolor('#0e1117')
     ax.set_facecolor('#0e1117')
 
-    # Draw edges
     for label in topo:
         x1, y1 = pos[label]
         for pred in act_info[label]['preds']:
             x0, y0 = pos[pred]
-            ax.annotate("",
-                        xy=(x1 - 0.55, y1), xytext=(x0 + 0.55, y0),
+            ax.annotate("", xy=(x1 - 0.55, y1), xytext=(x0 + 0.55, y0),
                         arrowprops=dict(arrowstyle="-|>", color='#4fc3f7',
                                         lw=1.8, connectionstyle="arc3,rad=0.1"))
 
-    # Draw nodes
     for label in topo:
         x, y = pos[label]
-        # Color by criticality if available
         if criticality_pct and criticality_pct.get(label, 0) > 70:
-            node_color = '#ff5252'
+            nc = '#ff5252'
         elif criticality_pct and criticality_pct.get(label, 0) > 40:
-            node_color = '#ffd740'
+            nc = '#ffd740'
         else:
-            node_color = '#4fc3f7'
-
-        circle = plt.Circle((x, y), 0.5, color=node_color, ec='white', lw=2, zorder=3)
+            nc = '#4fc3f7'
+        circle = plt.Circle((x, y), 0.5, color=nc, ec='white', lw=2, zorder=3)
         ax.add_patch(circle)
         ax.text(x, y + 0.05, label, ha='center', va='center', fontsize=13,
                 fontweight='bold', color='white', zorder=4)
-
-        # Activity name below
         short_name = name_map.get(label, label)
         if len(short_name) > 18:
             short_name = short_name[:16] + '..'
         ax.text(x, y - 0.75, short_name, ha='center', va='top', fontsize=8,
                 color='#aaaaaa', zorder=4)
-
-        # Duration range above
         info = act_info[label]
-        dur_text = f"[{info['min']:.0f}, {info['avg']:.0f}, {info['max']:.0f}]"
-        ax.text(x, y + 0.72, dur_text, ha='center', va='bottom', fontsize=7,
-                color='#888888', zorder=4)
+        ax.text(x, y + 0.72, f"[{info['min']:.0f}, {info['avg']:.0f}, {info['max']:.0f}]",
+                ha='center', va='bottom', fontsize=7, color='#888888', zorder=4)
 
-    # Axis setup
     all_x = [p[0] for p in pos.values()]
     all_y = [p[1] for p in pos.values()]
     margin = 1.5
@@ -464,8 +472,6 @@ def draw_network_graph(df, act_info, topo, criticality_pct=None):
     ax.set_aspect('equal')
     ax.axis('off')
     ax.set_title('Project Network Diagram', color='white', fontsize=14, fontweight='bold', pad=15)
-
-    # Legend if criticality available
     if criticality_pct:
         legend_elements = [
             mpatches.Patch(facecolor='#ff5252', edgecolor='white', label='High criticality (>70%)'),
@@ -474,13 +480,11 @@ def draw_network_graph(df, act_info, topo, criticality_pct=None):
         ]
         ax.legend(handles=legend_elements, loc='lower right', fontsize=8,
                   facecolor='#1a1a2e', edgecolor='#555', labelcolor='white')
-
     plt.tight_layout()
     return fig
 
 
 def dark_fig(figsize=(12, 5)):
-    """Create a dark-themed figure."""
     fig, ax = plt.subplots(figsize=figsize)
     fig.patch.set_facecolor('#0e1117')
     ax.set_facecolor('#0e1117')
@@ -491,19 +495,81 @@ def dark_fig(figsize=(12, 5)):
         ax.spines[spine].set_visible(False)
     return fig, ax
 
+
+def draw_gantt(topo, act_info, schedule, name_map, criticality_pct=None):
+    """Draw a Gantt chart showing mean schedule with float/slack."""
+    ES = schedule['ES']
+    EF = schedule['EF']
+    slack = schedule['slack']
+    mean_dur = schedule['mean_dur']
+    pf = schedule['project_finish']
+
+    sorted_labels = sorted(topo, key=lambda l: (ES.get(l, 0), l))
+    n = len(sorted_labels)
+
+    fig, ax = dark_fig((13, max(4, n * 0.65)))
+
+    for i, lbl in enumerate(sorted_labels):
+        es = ES[lbl]
+        dur = mean_dur[lbl]
+        fl = max(0.0, slack.get(lbl, 0))
+        crit = (criticality_pct or {}).get(lbl, 0)
+
+        color = '#ff5252' if crit > 70 else '#ffd740' if crit > 40 else '#4fc3f7'
+
+        # Float bar (dashed)
+        if fl > 0.05:
+            ax.barh(i, fl, left=EF[lbl], color=color, edgecolor=color,
+                    height=0.45, alpha=0.15, zorder=2, linewidth=1.2, linestyle='--')
+
+        # Work bar
+        ax.barh(i, dur, left=es, color=color, edgecolor='white',
+                height=0.55, alpha=0.88, zorder=3)
+
+        # Duration label inside bar
+        if dur >= 1.0:
+            ax.text(es + dur / 2, i, f"{dur:.1f}w", ha='center', va='center',
+                    fontsize=8.5, color='white', fontweight='bold', zorder=4)
+
+        # Float label
+        if fl > 0.8:
+            ax.text(EF[lbl] + fl / 2, i, f"+{fl:.1f}w", ha='center', va='center',
+                    fontsize=7, color=color, alpha=0.75, zorder=4)
+
+        # Criticality badge
+        if criticality_pct is not None:
+            ax.text(pf * 1.02, i, f"{crit:.0f}%", ha='left', va='center',
+                    fontsize=7.5, color=color, fontweight='bold', zorder=4)
+
+    ax.set_yticks(range(n))
+    ax.set_yticklabels([f"{l}  {name_map.get(l, l)}" for l in sorted_labels],
+                       fontsize=9.5, color='white')
+    ax.invert_yaxis()
+    ax.set_xlabel('Week from Project Start', color='white', fontsize=11)
+    ax.set_xlim(-0.5, pf * 1.12)
+    ax.set_title('Gantt Chart — Mean Schedule  (bar = work  |  dashed = float/slack)',
+                 color='white', fontsize=13, fontweight='bold')
+    ax.grid(axis='x', alpha=0.15, color='white')
+
+    legend_patches = [
+        mpatches.Patch(color='#ff5252', label='High criticality (>70%)'),
+        mpatches.Patch(color='#ffd740', label='Medium (40-70%)'),
+        mpatches.Patch(color='#4fc3f7', label='Low (<40%)'),
+    ]
+    ax.legend(handles=legend_patches, loc='lower right', fontsize=8,
+              facecolor='#1a1a2e', edgecolor='#555', labelcolor='white')
+
+    if criticality_pct is not None:
+        ax.text(pf * 1.02, -0.8, "Crit%", fontsize=7.5, color='#888',
+                fontweight='bold', va='center')
+
+    plt.tight_layout()
+    return fig
+
 # ============================================================
 # RUN SIMULATION BUTTON
 # ============================================================
 st.markdown("---")
-st.markdown("""
-<style>
-div.stButton > button[kind="primary"] {
-    font-size: 1.25rem;
-    padding: 0.85rem 2rem;
-    letter-spacing: 0.5px;
-}
-</style>
-""", unsafe_allow_html=True)
 run_col1, run_col2, run_col3 = st.columns([1, 3, 1])
 with run_col2:
     run_button = st.button("Run Monte Carlo Simulation", type="primary", use_container_width=True)
@@ -514,7 +580,7 @@ if run_button:
         for e in errors:
             st.error(e)
     else:
-        topo = topological_sort(edited_df)
+        topo = topo_sort(edited_df)
         if topo is None:
             st.error("Cycle detected in the activity network. Please check predecessors.")
         else:
@@ -530,6 +596,9 @@ if run_button:
                     'max': float(row['Max Duration']),
                 }
 
+            name_map = {str(row['Label']).strip(): str(row['Activity']).strip()
+                        for _, row in edited_df.iterrows()}
+
             rng = np.random.default_rng(seed if seed > 0 else None)
 
             with st.spinner("Running simulation..."):
@@ -537,15 +606,49 @@ if run_button:
                     topo, act_info, rng, dist_type, num_simulations
                 )
 
+            # Deterministic schedule (PERT analytical)
+            schedule = compute_deterministic_schedule(topo, act_info)
+
             mean_dur = np.mean(project_durations)
             std_dur = np.std(project_durations)
             p_service = np.percentile(project_durations, service_level)
             median_dur = np.median(project_durations)
+            cv_pct = (std_dur / mean_dur * 100) if mean_dur > 0 else 0
+            crit_pct = {l: activity_on_critical[l] / num_simulations * 100 for l in topo}
+
+            # PERT analytical estimate
+            cp = schedule['critical']
+            pert_project_mean = schedule['project_finish']
+            pert_cp_std = np.sqrt(sum(pert_variance(act_info[l]['min'], act_info[l]['max']) for l in cp))
+            from scipy.stats import norm
+            z = norm.ppf(service_level / 100)
+            pert_service_level = pert_project_mean + z * pert_cp_std
+
+            # ============================================================
+            # PROJECT HEALTH INDICATOR
+            # ============================================================
+            st.markdown("---")
+            if cv_pct < 5:
+                health_color, health_text = '#69f0ae', 'Low Risk'
+            elif cv_pct < 10:
+                health_color, health_text = '#ffd740', 'Moderate Risk'
+            else:
+                health_color, health_text = '#ff5252', 'High Risk'
+
+            st.markdown(f"""
+            <div style="text-align: center; margin-bottom: 1rem;">
+                <span style="font-size: 1.3rem; font-weight: 700; color: {health_color};">
+                    Schedule Risk: {health_text}
+                </span>
+                <span style="color: #888; font-size: 0.95rem; margin-left: 1rem;">
+                    (CV = {cv_pct:.1f}%)
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
 
             # ============================================================
             # RESULTS — METRICS
             # ============================================================
-            st.markdown("---")
             st.markdown('<div class="section-header">Simulation Results</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="insight-box">Distribution: <b>{dist_type}</b> &nbsp;|&nbsp; '
                         f'Iterations: <b>{num_simulations:,}</b> &nbsp;|&nbsp; '
@@ -567,14 +670,68 @@ if run_button:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # ============================================================
+            # PERT vs MONTE CARLO COMPARISON
+            # ============================================================
+            st.markdown('<div class="section-header">PERT Analytical vs Monte Carlo Comparison</div>',
+                        unsafe_allow_html=True)
+            st.markdown('<div class="insight-box">PERT uses the normal approximation along the critical path. '
+                        'Monte Carlo simulates all paths and captures path-switching effects.</div>',
+                        unsafe_allow_html=True)
+
+            comp_df = pd.DataFrame({
+                'Method': ['PERT (Analytical)', 'Monte Carlo'],
+                'Mean Duration (wks)': [f"{pert_project_mean:.2f}", f"{mean_dur:.2f}"],
+                f'{service_level}% Completion (wks)': [f"{pert_service_level:.2f}", f"{p_service:.2f}"],
+                'Critical Path Std Dev (wks)': [f"{pert_cp_std:.2f}", f"{std_dur:.2f}"],
+            })
+            st.dataframe(comp_df, use_container_width=True, hide_index=True)
+
+            # Critical path display
+            cp_str = " -> ".join([f"{l} ({name_map.get(l, l)})" for l in cp])
+            st.markdown(f'<div class="insight-box">Dominant Critical Path: <b>{cp_str}</b><br>'
+                        f'Total mean duration along critical path: <b>{pert_project_mean:.1f} weeks</b></div>',
+                        unsafe_allow_html=True)
+
+            # ============================================================
+            # SCHEDULE TABLE (ES, EF, LS, LF, Float, Critical)
+            # ============================================================
+            st.markdown('<div class="section-header">Schedule Table (PERT Mean Durations)</div>',
+                        unsafe_allow_html=True)
+
+            sched_rows = []
+            for lbl in topo:
+                sched_rows.append({
+                    'Label': lbl,
+                    'Activity': name_map.get(lbl, lbl),
+                    'PERT Mean': f"{schedule['mean_dur'][lbl]:.2f}",
+                    'ES': f"{schedule['ES'][lbl]:.2f}",
+                    'EF': f"{schedule['EF'][lbl]:.2f}",
+                    'LS': f"{schedule['LS'][lbl]:.2f}",
+                    'LF': f"{schedule['LF'][lbl]:.2f}",
+                    'Float': f"{schedule['slack'][lbl]:.2f}",
+                    'Critical': 'Yes' if lbl in cp else '',
+                })
+            st.dataframe(pd.DataFrame(sched_rows), use_container_width=True, hide_index=True)
+
+            # ============================================================
             # NETWORK GRAPH — colored by criticality
             # ============================================================
             st.markdown('<div class="section-header">Network Diagram (Criticality Colored)</div>',
                         unsafe_allow_html=True)
-            crit_pct = {l: activity_on_critical[l] / num_simulations * 100 for l in topo}
-            fig_net2 = draw_network_graph(edited_df, act_info, topo, criticality_pct=crit_pct)
-            st.pyplot(fig_net2)
-            plt.close(fig_net2)
+            fig_net = draw_network_graph(edited_df, act_info, topo, criticality_pct=crit_pct)
+            st.pyplot(fig_net)
+            plt.close(fig_net)
+
+            # ============================================================
+            # GANTT CHART
+            # ============================================================
+            st.markdown('<div class="section-header">Gantt Chart</div>', unsafe_allow_html=True)
+            st.markdown('<div class="insight-box">Bars show each activity\'s mean duration (ES to EF). '
+                        'Dashed extension = float (slack). Color = criticality level. '
+                        'Percentage on the right = criticality index.</div>', unsafe_allow_html=True)
+            fig_gantt = draw_gantt(topo, act_info, schedule, name_map, criticality_pct=crit_pct)
+            st.pyplot(fig_gantt)
+            plt.close(fig_gantt)
 
             # ============================================================
             # HISTOGRAM
@@ -610,8 +767,7 @@ if run_button:
             st.markdown('<div class="section-header">Cumulative Probability (S-Curve)</div>',
                         unsafe_allow_html=True)
             st.markdown('<div class="insight-box">The S-curve shows the probability of completing the project '
-                        'within a given number of weeks. Find your desired confidence level on the Y-axis '
-                        'and read across to the X-axis.</div>', unsafe_allow_html=True)
+                        'within a given number of weeks.</div>', unsafe_allow_html=True)
 
             fig2, ax2 = dark_fig((12, 5))
             sorted_dur = np.sort(project_durations)
@@ -643,13 +799,9 @@ if run_button:
                         'are the biggest risk drivers.</div>', unsafe_allow_html=True)
 
             crit_data = []
-            name_map = {}
-            for _, row in edited_df.iterrows():
-                name_map[str(row['Label']).strip()] = str(row['Activity']).strip()
             for label in topo:
-                pct = activity_on_critical[label] / num_simulations * 100
                 crit_data.append({'Label': label, 'Activity': name_map.get(label, label),
-                                  'Criticality (%)': pct})
+                                  'Criticality (%)': crit_pct[label]})
             crit_df = pd.DataFrame(crit_data).sort_values('Criticality (%)', ascending=True)
 
             fig3, ax3 = dark_fig((10, max(3, len(topo) * 0.6)))
@@ -671,31 +823,28 @@ if run_button:
             plt.close(fig3)
 
             # ============================================================
-            # TORNADO CHART — Correlation Sensitivity
+            # TORNADO CHART
             # ============================================================
             st.markdown('<div class="section-header">Tornado Chart — Duration Sensitivity</div>',
                         unsafe_allow_html=True)
-            st.markdown('<div class="insight-box">Shows the Spearman rank correlation between each '
-                        'activity\'s sampled duration and the total project duration. '
+            st.markdown('<div class="insight-box">Spearman rank correlation between each '
+                        'activity\'s sampled duration and total project duration. '
                         'Higher absolute correlation = more influence on project length.</div>',
                         unsafe_allow_html=True)
 
-            from scipy import stats as sp_stats
             correlations = []
             for label in topo:
                 corr, _ = sp_stats.spearmanr(activity_durations[label], project_durations)
                 correlations.append({
-                    'Label': label,
-                    'Activity': name_map.get(label, label),
+                    'Label': label, 'Activity': name_map.get(label, label),
                     'Correlation': corr if not np.isnan(corr) else 0.0,
                 })
             corr_df = pd.DataFrame(correlations).sort_values('Correlation', key=abs, ascending=True)
 
             fig4, ax4 = dark_fig((10, max(3, len(topo) * 0.6)))
             bar_colors = ['#ff5252' if v > 0 else '#4fc3f7' for v in corr_df['Correlation']]
-            ax4.barh(
-                [f"{r['Label']}: {r['Activity']}" for _, r in corr_df.iterrows()],
-                corr_df['Correlation'], color=bar_colors, edgecolor='none', height=0.6)
+            ax4.barh([f"{r['Label']}: {r['Activity']}" for _, r in corr_df.iterrows()],
+                     corr_df['Correlation'], color=bar_colors, edgecolor='none', height=0.6)
             for i, (_, r) in enumerate(corr_df.iterrows()):
                 offset = 0.02 if r['Correlation'] >= 0 else -0.02
                 ha = 'left' if r['Correlation'] >= 0 else 'right'
@@ -711,21 +860,18 @@ if run_button:
             plt.close(fig4)
 
             # ============================================================
-            # BOX PLOT — Per-Activity Duration Distributions
+            # BOX PLOTS
             # ============================================================
             st.markdown('<div class="section-header">Activity Duration Box Plots</div>',
                         unsafe_allow_html=True)
-            st.markdown('<div class="insight-box">Box plots show the spread of sampled durations for each '
-                        'activity. The box covers the interquartile range (25th-75th percentile), '
-                        'the line is the median, and whiskers extend to 1.5x IQR.</div>',
+            st.markdown('<div class="insight-box">Box plots show the spread of sampled durations. '
+                        'Box = IQR (25th-75th), line = median, whiskers = 1.5x IQR.</div>',
                         unsafe_allow_html=True)
 
             fig5, ax5 = dark_fig((12, max(4, len(topo) * 0.55)))
             box_data = [activity_durations[label] for label in topo]
             box_labels = [f"{l}: {name_map.get(l, l)}" for l in topo]
-
-            bp = ax5.boxplot(box_data, vert=False, labels=box_labels, patch_artist=True,
-                             widths=0.5,
+            bp = ax5.boxplot(box_data, vert=False, labels=box_labels, patch_artist=True, widths=0.5,
                              boxprops=dict(facecolor='#1a1a2e', edgecolor='#4fc3f7', linewidth=1.5),
                              whiskerprops=dict(color='#4fc3f7', linewidth=1.2),
                              capprops=dict(color='#4fc3f7', linewidth=1.2),
@@ -742,7 +888,43 @@ if run_button:
             plt.close(fig5)
 
             # ============================================================
-            # RISK MATRIX — Probability of Finishing by Week X
+            # SCHEDULE CONTINGENCY BUFFER CHART
+            # ============================================================
+            st.markdown('<div class="section-header">Schedule Contingency Buffer</div>',
+                        unsafe_allow_html=True)
+            st.markdown(f'<div class="insight-box">Baseline (PERT mean) = <b>{pert_project_mean:.1f} weeks</b>. '
+                        f'Buffer needed above baseline to reach each confidence level.</div>',
+                        unsafe_allow_html=True)
+
+            pcts = [50, 60, 70, 75, 80, 85, 90, 95, 97, 99]
+            buffers = [max(0.0, float(np.percentile(project_durations, p)) - pert_project_mean) for p in pcts]
+            buf_colors = ['#ff5252' if p >= 90 else '#ffd740' if p >= 75 else '#4fc3f7' for p in pcts]
+
+            fig6, ax6 = dark_fig((10, 4.5))
+            buf_bars = ax6.bar([f"{p}%" for p in pcts], buffers, color=buf_colors,
+                               edgecolor='none', width=0.6)
+            for bar, val in zip(buf_bars, buffers):
+                ax6.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.1,
+                         f"{val:.1f}w", ha='center', va='bottom', color='white', fontsize=9)
+            ax6.set_xlabel('Confidence Level', color='white', fontsize=12)
+            ax6.set_ylabel('Buffer Required (weeks)', color='white', fontsize=12)
+            ax6.set_title(f'Schedule Contingency Buffer (above baseline of {pert_project_mean:.1f} wks)',
+                          color='white', fontsize=13, fontweight='bold')
+            ax6.grid(axis='y', alpha=0.15, color='white')
+            plt.tight_layout()
+            st.pyplot(fig6)
+            plt.close(fig6)
+
+            # Buffer table
+            buf_df = pd.DataFrame({
+                'Confidence': [f"{p}%" for p in pcts],
+                'Completion (wks)': [f"{np.percentile(project_durations, p):.1f}" for p in pcts],
+                'Buffer above baseline (wks)': [f"{b:.1f}" for b in buffers],
+            })
+            st.dataframe(buf_df, use_container_width=True, hide_index=True)
+
+            # ============================================================
+            # COMPLETION PROBABILITY LOOKUP
             # ============================================================
             st.markdown('<div class="section-header">Completion Probability Lookup</div>',
                         unsafe_allow_html=True)
@@ -755,25 +937,64 @@ if run_button:
                     "Target completion (weeks)",
                     min_value=float(np.floor(np.min(project_durations))),
                     max_value=float(np.ceil(np.max(project_durations))) + 10,
-                    value=float(round(p_service, 1)),
-                    step=0.5,
+                    value=float(round(p_service, 1)), step=0.5,
                 )
             with target_col2:
                 prob = np.mean(project_durations <= target_week) * 100
-                if prob >= 90:
-                    color = '#69f0ae'
-                elif prob >= 50:
-                    color = '#ffd740'
-                else:
-                    color = '#ff5252'
+                color = '#69f0ae' if prob >= 90 else '#ffd740' if prob >= 50 else '#ff5252'
+                advice = ("Very safe deadline." if prob >= 90
+                          else "Moderate confidence. Consider buffer on high-criticality activities."
+                          if prob >= 50 else "Low confidence. Add contingency or compress scope.")
                 st.markdown(f"""
                 <div class="metric-card" style="margin-top: 0.5rem;">
                     <div class="metric-value" style="color: {color};">{prob:.1f}%</div>
                     <div class="metric-label">Probability of finishing by week {target_week:.1f}</div>
                 </div>""", unsafe_allow_html=True)
+                st.markdown(f'<p style="color: {color}; font-size: 0.9rem; margin-top: 0.5rem;">{advice}</p>',
+                            unsafe_allow_html=True)
 
             # ============================================================
-            # SUMMARY STATISTICS TABLE
+            # PERCENTILE LOOKUP TABLE
+            # ============================================================
+            st.markdown('<div class="section-header">Percentile Lookup Table</div>', unsafe_allow_html=True)
+            pct_rows = [{'Service Level': f"{p}%",
+                         'Completion Time (wks)': f"{np.percentile(project_durations, p):.1f}"}
+                        for p in [50, 60, 70, 75, 80, 85, 90, 95, 97, 99]]
+            st.dataframe(pd.DataFrame(pct_rows), use_container_width=True, hide_index=True)
+
+            # ============================================================
+            # ACTIVITY RISK PROFILE
+            # ============================================================
+            st.markdown('<div class="section-header">Activity Risk Profile</div>', unsafe_allow_html=True)
+            st.markdown('<div class="insight-box">Combined view of duration uncertainty and schedule criticality. '
+                        'Use this to prioritize where estimation effort and monitoring matter most.</div>',
+                        unsafe_allow_html=True)
+
+            risk_rows = []
+            for label in topo:
+                info = act_info[label]
+                md = pert_mean(info['min'], info['avg'], info['max'])
+                unc = info['max'] - info['min']
+                cv = (unc / 6.0) / md * 100 if md > 0 else 0
+                crit = crit_pct[label]
+                if crit >= 70 or (crit >= 30 and cv >= 20):
+                    rating = "High"
+                elif crit >= 30 or cv >= 15:
+                    rating = "Medium"
+                else:
+                    rating = "Low"
+                risk_rows.append({
+                    'Label': label, 'Activity': name_map.get(label, label),
+                    'Mean Duration (wks)': f"{md:.2f}",
+                    'Uncertainty Range (wks)': f"{unc:.1f}",
+                    'Coeff. of Variation (%)': f"{cv:.1f}",
+                    'Criticality (%)': f"{crit:.1f}",
+                    'Risk Rating': rating,
+                })
+            st.dataframe(pd.DataFrame(risk_rows), use_container_width=True, hide_index=True)
+
+            # ============================================================
+            # SUMMARY STATISTICS
             # ============================================================
             st.markdown('<div class="section-header">Summary Statistics</div>', unsafe_allow_html=True)
             stats_df = pd.DataFrame({
@@ -792,7 +1013,7 @@ if run_button:
             st.dataframe(stats_df, use_container_width=True, hide_index=True)
 
             # ============================================================
-            # PER-ACTIVITY STATS TABLE
+            # PER-ACTIVITY STATS
             # ============================================================
             st.markdown('<div class="section-header">Per-Activity Duration Statistics</div>',
                         unsafe_allow_html=True)
@@ -800,15 +1021,41 @@ if run_button:
             for label in topo:
                 d = activity_durations[label]
                 act_stats.append({
-                    'Label': label,
-                    'Activity': name_map.get(label, label),
-                    'Mean': f"{np.mean(d):.2f}",
-                    'Std Dev': f"{np.std(d):.2f}",
-                    'Min Sampled': f"{np.min(d):.2f}",
-                    'Max Sampled': f"{np.max(d):.2f}",
-                    'Criticality': f"{activity_on_critical[label] / num_simulations * 100:.1f}%",
+                    'Label': label, 'Activity': name_map.get(label, label),
+                    'Mean': f"{np.mean(d):.2f}", 'Std Dev': f"{np.std(d):.2f}",
+                    'Min Sampled': f"{np.min(d):.2f}", 'Max Sampled': f"{np.max(d):.2f}",
+                    'Criticality': f"{crit_pct[label]:.1f}%",
                 })
             st.dataframe(pd.DataFrame(act_stats), use_container_width=True, hide_index=True)
+
+            # ============================================================
+            # EXPORT RESULTS
+            # ============================================================
+            st.markdown('<div class="section-header">Export Results</div>', unsafe_allow_html=True)
+            exp1, exp2 = st.columns(2)
+            with exp1:
+                raw_csv = pd.DataFrame({'Simulated Duration (weeks)': project_durations}).to_csv(index=False)
+                st.download_button("Download Raw Simulation Data (CSV)", data=raw_csv,
+                                   file_name="simulation_raw_output.csv", mime="text/csv",
+                                   use_container_width=True)
+            with exp2:
+                summary_export = pd.DataFrame([
+                    {'Metric': 'Distribution', 'Value': dist_type},
+                    {'Metric': 'Iterations', 'Value': num_simulations},
+                    {'Metric': 'Seed', 'Value': seed if seed > 0 else 'random'},
+                    {'Metric': 'Mean Duration (wks)', 'Value': f"{mean_dur:.2f}"},
+                    {'Metric': 'Std Deviation (wks)', 'Value': f"{std_dur:.2f}"},
+                    {'Metric': 'PERT Baseline (wks)', 'Value': f"{pert_project_mean:.2f}"},
+                    {'Metric': 'Median (wks)', 'Value': f"{median_dur:.2f}"},
+                    {'Metric': f'P{service_level} (wks)', 'Value': f"{p_service:.2f}"},
+                    {'Metric': 'P80 (wks)', 'Value': f"{np.percentile(project_durations, 80):.2f}"},
+                    {'Metric': 'P90 (wks)', 'Value': f"{np.percentile(project_durations, 90):.2f}"},
+                    {'Metric': 'P99 (wks)', 'Value': f"{np.percentile(project_durations, 99):.2f}"},
+                ])
+                summary_csv = summary_export.to_csv(index=False)
+                st.download_button("Download Summary Statistics (CSV)", data=summary_csv,
+                                   file_name="simulation_summary.csv", mime="text/csv",
+                                   use_container_width=True)
 
             # ============================================================
             # COMPLETION

@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 *.pptx
 Computer Design Instructions.png
+1. glory-pert_analyzer.py
+2. pert_cpm_app_hanna.py
