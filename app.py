@@ -86,7 +86,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("## Distribution Type")
 dist_type = st.sidebar.selectbox(
     "Choose probability distribution",
-    ["Triangular", "PERT (Beta)", "Uniform", "Normal (truncated)", "Lognormal"],
+    ["Uniform", "Triangular", "PERT (Beta)", "Normal (truncated)", "Lognormal"],
     help="Triangular uses min/mode/max. PERT gives more weight to the mode. "
          "Uniform treats all values equally. Normal uses avg as mean. "
          "Lognormal is right-skewed, good for approvals/procurement."
@@ -143,7 +143,9 @@ with tab_edit:
 with tab_upload:
     st.markdown("Upload a CSV or Excel file with columns: `Label`, `Activity`, `Predecessors`, "
                 "`Min Duration`, `Avg Duration`, `Max Duration`")
-    uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx", "xls"])
+    st.markdown("")
+    uploaded_file = st.file_uploader("Select your project file", type=["csv", "xlsx", "xls"],
+                                     label_visibility="visible")
     if uploaded_file is not None:
         try:
             if uploaded_file.name.endswith('.csv'):
