@@ -132,7 +132,6 @@ st.sidebar.markdown(f'<div class="dist-info"><b>{dist_type}</b><br>{DIST_DESCRIP
                     unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
-run_button = st.sidebar.button("Run Monte Carlo Simulation", type="primary", use_container_width=True)
 if st.session_state.sim_results is not None:
     st.sidebar.success("Results ready — check the tabs")
 st.sidebar.markdown("---")
@@ -479,10 +478,8 @@ with tab_setup:
                 "Max Duration": st.column_config.NumberColumn("Max", min_value=0.0, format="%.1f"),
             })
     with sub_upload:
-        st.markdown("Upload a CSV or Excel file with the following columns:")
-        st.markdown("`Label`, `Activity`, `Predecessors`, `Min Duration`, `Avg Duration`, `Max Duration`")
         uploaded_file = st.file_uploader(
-            "Drag and drop or browse", type=["csv", "xlsx", "xls"])
+            "Upload CSV or Excel (.csv, .xlsx)", type=["csv", "xlsx", "xls"])
         if uploaded_file is not None:
             try:
                 if uploaded_file.name.endswith('.csv'):
@@ -523,6 +520,11 @@ with tab_setup:
 
     st.download_button("Download table as CSV", data=edited_df.to_csv(index=False).encode(),
                        file_name="project_activities.csv", mime="text/csv")
+
+    st.markdown("---")
+    run_col1, run_col2, run_col3 = st.columns([1, 3, 1])
+    with run_col2:
+        run_button = st.button("Run Monte Carlo Simulation", type="primary", use_container_width=True)
 
 
 # RUN SIMULATION (triggered from sidebar)
