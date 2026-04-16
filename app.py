@@ -115,7 +115,7 @@ num_simulations = st.sidebar.slider("Number of Simulations", 1000, 100000, 10000
 seed = st.sidebar.number_input("Random Seed (0 = random)", min_value=0, max_value=99999, value=42)
 service_level = st.sidebar.slider("Service Level (%)", 50, 99, 95)
 
-st.sidebar.markdown("---")
+st.sidebar.markdown("<hr style='margin:0.5rem 0;border:none;border-top:1px solid #333;'>", unsafe_allow_html=True)
 st.sidebar.markdown("## Distribution Type")
 dist_type = st.sidebar.selectbox(
     "Choose probability distribution",
@@ -129,13 +129,41 @@ DIST_DESCRIPTIONS = {
     "Lognormal": "Right-skewed distribution. Good for activities like approvals or procurement with long tails.",
     "Exponential": "Models time between events. Right-skewed. Good for wait times, repair durations. Uses avg as the mean rate.",
 }
-st.sidebar.markdown(f'<div class="dist-info"><b>{dist_type}</b><br>{DIST_DESCRIPTIONS[dist_type]}</div>',
-                    unsafe_allow_html=True)
 
-st.sidebar.markdown("---")
+
+st.sidebar.markdown("<hr style='margin:0.5rem 0;border:none;border-top:1px solid #333;'>", unsafe_allow_html=True)
 if st.session_state.sim_results is not None:
     st.sidebar.success("Results ready — check the tabs")
-st.sidebar.markdown("---")
+
+st.sidebar.markdown("## Upload Project File")
+sidebar_upload_file = st.sidebar.file_uploader(
+    "CSV or Excel", type=["csv", "xlsx", "xls"])
+if sidebar_upload_file is not None:
+    try:
+        if sidebar_upload_file.name.endswith(".csv"):
+            _udf = pd.read_csv(sidebar_upload_file)
+        else:
+            _udf = pd.read_excel(sidebar_upload_file)
+        _req = {"Label", "Activity", "Predecessors", "Min Duration", "Avg Duration", "Max Duration"}
+        if _req.issubset(set(_udf.columns)):
+            _udf["Predecessors"] = _udf["Predecessors"].fillna("")
+            st.session_state.df = _udf[list(_req)].copy()
+            st.sidebar.success(f"Loaded {len(_udf)} activities")
+        else:
+            st.sidebar.error(f"Missing: {', '.join(_req - set(_udf.columns))}")
+    except Exception as e:
+        st.sidebar.error(f"Error: {e}")
+
+_tpl_csv = pd.DataFrame({
+    'Label': ['A','B','C'], 'Activity': ['Task 1','Task 2','Task 3'],
+    'Predecessors': ['','A','A,B'], 'Min Duration': [1,2,3],
+    'Avg Duration': [3,4,5], 'Max Duration': [5,6,7],
+}).to_csv(index=False)
+st.sidebar.download_button("Download CSV Template", data=_tpl_csv,
+                           file_name="project_template.csv", mime="text/csv",
+                           use_container_width=True, key="sidebar_template")
+
+st.sidebar.markdown("<hr style='margin:0.5rem 0;border:none;border-top:1px solid #333;'>", unsafe_allow_html=True)
 st.sidebar.markdown("Built with Streamlit")
 
 # ============================================================
@@ -465,53 +493,32 @@ tab_setup, tab_dash, tab_gantt, tab_risk, tab_sched = st.tabs([
 with tab_setup:
     st.markdown('<div class="section-header">Project Activities</div>',
                 unsafe_allow_html=True)
-    sub_edit, sub_upload, sub_template = st.tabs([
-        "Edit Table", "Upload CSV/Excel", "Download Template"
-    ])
-    with sub_edit:
-        st.markdown("Edit the table below. Use comma-separated labels "
-                    "for predecessors (e.g., `C,D`).")
-        if 'df' not in st.session_state:
-            st.session_state.df = pd.DataFrame(DEFAULT_DATA)
-        edited_df = st.data_editor(
-            st.session_state.df, num_rows="dynamic",
-            use_container_width=True, key="activity_table",
-            column_config={
-                "Label": st.column_config.TextColumn("Label", width="small"),
-                "Activity": st.column_config.TextColumn("Activity Name", width="medium"),
-                "Predecessors": st.column_config.TextColumn("Predecessors", width="small"),
-                "Min Duration": st.column_config.NumberColumn("Min", min_value=0.0, format="%.1f"),
-                "Avg Duration": st.column_config.NumberColumn("Avg (Mode)", min_value=0.0, format="%.1f"),
-                "Max Duration": st.column_config.NumberColumn("Max", min_value=0.0, format="%.1f"),
-            })
-    with sub_upload:
-        uploaded_file = st.file_uploader(
-            "Upload CSV or Excel (.csv, .xlsx)", type=["csv", "xlsx", "xls"])
-        if uploaded_file is not None:
-            try:
-                if uploaded_file.name.endswith('.csv'):
-                    upload_df = pd.read_csv(uploaded_file)
-                else:
-                    upload_df = pd.read_excel(uploaded_file)
-                req = {'Label', 'Activity', 'Predecessors',
-                       'Min Duration', 'Avg Duration', 'Max Duration'}
-                if req.issubset(set(upload_df.columns)):
-                    upload_df['Predecessors'] = upload_df['Predecessors'].fillna('')
-                    st.session_state.df = upload_df[list(req)].copy()
-                    edited_df = st.session_state.df
-                    st.success(f"Loaded {len(upload_df)} activities from {uploaded_file.name}")
-                    st.dataframe(upload_df, use_container_width=True, hide_index=True)
-                else:
-                    st.error(f"Missing columns: {', '.join(req - set(upload_df.columns))}")
-            except Exception as e:
-                st.error(f"Error reading file: {e}")
-    with sub_template:
-        st.markdown("Download a template pre-filled with the Computer Design project.")
-        tpl = pd.DataFrame(DEFAULT_DATA)
-        st.download_button("Download CSV Template", data=tpl.to_csv(index=False),
+    st.markdown("Edit the table below. Use comma-separated labels "
+                "for predecessors (e.g., `C,D`). Upload a file via the sidebar.")
+    if 'df' not in st.session_state:
+        st.session_state.df = pd.DataFrame(DEFAULT_DATA)
+    edited_df = st.data_editor(
+        st.session_state.df, num_rows="dynamic",
+        use_container_width=True, key="activity_table",
+        column_config={
+            "Label": st.column_config.TextColumn("Label", width="small"),
+            "Activity": st.column_config.TextColumn("Activity Name", width="medium"),
+            "Predecessors": st.column_config.TextColumn("Predecessors", width="small"),
+            "Min Duration": st.column_config.NumberColumn("Min", min_value=0.0, format="%.1f"),
+            "Avg Duration": st.column_config.NumberColumn("Avg (Mode)", min_value=0.0, format="%.1f"),
+            "Max Duration": st.column_config.NumberColumn("Max", min_value=0.0, format="%.1f"),
+        })
+    dl1, dl2 = st.columns(2)
+    with dl1:
+        st.download_button("Download CSV Template",
+                           data=pd.DataFrame(DEFAULT_DATA).to_csv(index=False),
                            file_name="project_template.csv", mime="text/csv",
+                           use_container_width=True, key="main_template")
+    with dl2:
+        st.download_button("Download Current Table as CSV",
+                           data=edited_df.to_csv(index=False).encode(),
+                           file_name="project_activities.csv", mime="text/csv",
                            use_container_width=True)
-        st.dataframe(tpl, use_container_width=True, hide_index=True)
 
     errors = validate_data(edited_df)
     if errors:
@@ -525,8 +532,6 @@ with tab_setup:
             st.success("Network valid. Hit **Run Monte Carlo Simulation** in the sidebar.")
 
 
-    st.download_button("Download table as CSV", data=edited_df.to_csv(index=False).encode(),
-                       file_name="project_activities.csv", mime="text/csv")
 
     st.markdown("---")
     run_col1, run_col2, run_col3 = st.columns([1, 3, 1])
