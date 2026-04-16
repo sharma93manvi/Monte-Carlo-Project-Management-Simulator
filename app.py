@@ -67,11 +67,7 @@ div[data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
 div.stButton > button[kind="primary"] {
     font-size: 1.25rem; padding: 0.85rem 2rem; letter-spacing: 0.5px;
 }
-section[data-testid="stFileUploader"] label { font-size: 1rem !important; margin-bottom: 0.5rem !important; }
-section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] { padding: 1rem !important; }
-section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] span {
-    white-space: normal !important; line-height: 1.4 !important;
-}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -478,9 +474,7 @@ with tab_setup:
     with sub_upload:
         st.markdown("Upload a CSV or Excel file with columns: `Label`, `Activity`, "
                     "`Predecessors`, `Min Duration`, `Avg Duration`, `Max Duration`")
-        st.markdown("")
-        st.markdown("**Select your project file (.csv, .xlsx, .xls):**")
-        uploaded_file = st.file_uploader("Upload file", type=["csv", "xlsx", "xls"], label_visibility="collapsed")
+        uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx", "xls"])
         if uploaded_file is not None:
             try:
                 upload_df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
