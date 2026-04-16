@@ -689,13 +689,13 @@ with tab_dash:
         plt.tight_layout()
         st.pyplot(fig); plt.close(fig)
 
-        with st.expander("Full Summary Statistics"):
-            st.dataframe(pd.DataFrame({
-                'Statistic': ['Mean','Std Dev','Min','P25','Median','P75',f'P{service_level}','Max'],
-                'Weeks': [f"{mean_dur:.2f}", f"{std_dur:.2f}", f"{np.min(proj_dur):.2f}",
-                          f"{np.percentile(proj_dur,25):.2f}", f"{median_dur:.2f}",
-                          f"{np.percentile(proj_dur,75):.2f}", f"{p_service:.2f}", f"{np.max(proj_dur):.2f}"]
-            }), hide_index=True, use_container_width=True)
+        st.markdown("#### Summary Statistics")
+        st.dataframe(pd.DataFrame({
+            'Statistic': ['Mean','Std Dev','Min','P25','Median','P75',f'P{service_level}','Max'],
+            'Weeks': [f"{mean_dur:.2f}", f"{std_dur:.2f}", f"{np.min(proj_dur):.2f}",
+                      f"{np.percentile(proj_dur,25):.2f}", f"{median_dur:.2f}",
+                      f"{np.percentile(proj_dur,75):.2f}", f"{p_service:.2f}", f"{np.max(proj_dur):.2f}"]
+        }), hide_index=True, use_container_width=True)
 
 
 # ============================================================
