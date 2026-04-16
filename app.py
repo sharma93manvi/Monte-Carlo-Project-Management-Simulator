@@ -462,10 +462,13 @@ tab_setup, tab_dash, tab_gantt, tab_risk, tab_sched = st.tabs([
     "Risk Analysis", "Schedule Planning"
 ])
 
+# ============================================================
 # TAB 1 - PROJECT SETUP
+# ============================================================
 with tab_setup:
     st.markdown('<div class="section-header">Project Activities</div>', unsafe_allow_html=True)
     sub_edit, sub_upload, sub_template = st.tabs(["Edit Table", "Upload CSV/Excel", "Download Template"])
+
     with sub_edit:
         st.markdown("Edit the table below. Use comma-separated labels for predecessors (e.g., `C,D`).")
         if 'df' not in st.session_state:
@@ -480,6 +483,7 @@ with tab_setup:
                 "Avg Duration": st.column_config.NumberColumn("Avg (Mode)", min_value=0.0, format="%.1f"),
                 "Max Duration": st.column_config.NumberColumn("Max", min_value=0.0, format="%.1f"),
             })
+
     with sub_upload:
         st.markdown("Upload a CSV or Excel file with columns: `Label`, `Activity`, "
                     "`Predecessors`, `Min Duration`, `Avg Duration`, `Max Duration`")
@@ -498,12 +502,15 @@ with tab_setup:
                     st.error(f"Missing columns: {', '.join(req - set(upload_df.columns))}")
             except Exception as e:
                 st.error(f"Error reading file: {e}")
+
     with sub_template:
         st.markdown("Download a template pre-filled with the Computer Design project.")
         tpl = pd.DataFrame(DEFAULT_DATA)
         st.download_button("Download CSV Template", data=tpl.to_csv(index=False),
-                           file_name="project_template.csv", mime="text/csv", use_container_width=True)
+                           file_name="project_template.csv", mime="text/csv",
+                           use_container_width=True)
         st.dataframe(tpl, use_container_width=True, hide_index=True)
+
     errors = validate_data(edited_df)
     if errors:
         for e in errors:
@@ -514,12 +521,15 @@ with tab_setup:
             st.error("Cycle detected. Fix predecessors.")
         else:
             st.success("Network valid. Hit **Run Monte Carlo Simulation** in the sidebar.")
+
     with st.expander("Distribution Reference"):
         for d, desc in DIST_DESCRIPTIONS.items():
             st.markdown(f"- **{d}**: {desc}")
+
     with st.expander("Export current table as CSV"):
         st.download_button("Download table", data=edited_df.to_csv(index=False).encode(),
                            file_name="project_activities.csv", mime="text/csv")
+
 
 # RUN SIMULATION
 if run_button:
