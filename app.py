@@ -64,6 +64,15 @@ html, body, [class*="st-"] { font-family: 'Inter', sans-serif; }
     border-radius: 10px; padding: 1rem; margin: 0.5rem 0; font-size: 0.9rem;
 }
 div[data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
+div[data-testid="stExpander"] * {
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: unset !important;
+    background: none !important;
+}
+div[data-testid="stExpander"] summary span {
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: unset !important;
+}
 div.stButton > button[kind="primary"] {
     font-size: 1.25rem; padding: 0.85rem 2rem; letter-spacing: 0.5px;
 }
