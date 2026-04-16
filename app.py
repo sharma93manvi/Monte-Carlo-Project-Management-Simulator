@@ -119,14 +119,15 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("## Distribution Type")
 dist_type = st.sidebar.selectbox(
     "Choose probability distribution",
-    ["Uniform", "Triangular", "PERT (Beta)", "Normal (truncated)", "Lognormal"],
+    ["Uniform", "Normal (Gaussian)", "Triangular", "PERT (Beta)", "Lognormal", "Exponential"],
 )
 DIST_DESCRIPTIONS = {
     "Triangular": "Uses min, mode (most likely), and max. Good default when you have three-point estimates.",
     "PERT (Beta)": "Beta distribution weighted toward the mode (lambda=4). Less probability to extremes. Widely used in project management.",
     "Uniform": "Every value between min and max is equally likely. Use when you have no idea about the most likely value.",
-    "Normal (truncated)": "Bell curve centered on the average, truncated at min/max. Std dev = (max-min)/6.",
+    "Normal (Gaussian)": "Bell curve centered on the average, truncated at min/max. Std dev = (max-min)/6. Most common distribution in nature.",
     "Lognormal": "Right-skewed distribution. Good for activities like approvals or procurement with long tails.",
+    "Exponential": "Models time between events. Right-skewed. Good for wait times, repair durations. Uses avg as the mean rate.",
 }
 st.sidebar.markdown(f'<div class="dist-info"><b>{dist_type}</b><br>{DIST_DESCRIPTIONS[dist_type]}</div>',
                     unsafe_allow_html=True)
@@ -252,7 +253,7 @@ def sample_duration(rng, dist_type, lo, mode, hi):
         return lo + (hi - lo) * rng.beta(max(alpha, 0.01), max(beta_p, 0.01))
     elif dist_type == "Uniform":
         return rng.uniform(lo, hi)
-    elif dist_type == "Normal (truncated)":
+    elif dist_type == "Normal (Gaussian)":
         sigma = (hi - lo) / 6.0
         if sigma <= 0:
             return mode
@@ -268,6 +269,12 @@ def sample_duration(rng, dist_type, lo, mode, hi):
             return mode
         sig2 = np.log(1 + (std / mu_) ** 2)
         return np.clip(rng.lognormal(np.log(mu_) - sig2 / 2, np.sqrt(sig2)), lo, hi)
+    elif dist_type == "Exponential":
+        mean_rate = mode if mode > 0 else (lo + hi) / 2
+        if mean_rate <= 0:
+            return lo
+        val = rng.exponential(mean_rate)
+        return np.clip(val, lo, hi)
     return rng.triangular(lo, mode, hi)
 
 
