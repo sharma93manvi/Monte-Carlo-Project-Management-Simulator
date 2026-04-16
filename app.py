@@ -448,6 +448,12 @@ def draw_gantt(topo, act_info, schedule, name_map, crit_pct=None):
 # ============================================================
 # TABS
 # ============================================================
+tab_setup, tab_dash, tab_gantt, tab_risk, tab_sched = st.tabs([
+    "Project Setup", "Dashboard", "Gantt & Timeline",
+    "Risk Analysis", "Schedule Planning"
+])
+
+# ============================================================
 # TAB 1 - PROJECT SETUP
 # ============================================================
 with tab_setup:
