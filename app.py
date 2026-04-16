@@ -521,12 +521,9 @@ with tab_setup:
         else:
             st.success("Network valid. Hit **Run Monte Carlo Simulation** in the sidebar.")
 
-    with st.expander("Distribution Reference"):
-        for d, desc in DIST_DESCRIPTIONS.items():
-            st.markdown(f"- **{d}**: {desc}")
-    with st.expander("Export current table as CSV"):
-        st.download_button("Download table", data=edited_df.to_csv(index=False).encode(),
-                           file_name="project_activities.csv", mime="text/csv")
+
+    st.download_button("Download table as CSV", data=edited_df.to_csv(index=False).encode(),
+                       file_name="project_activities.csv", mime="text/csv")
 
 
 # RUN SIMULATION (triggered from sidebar)
