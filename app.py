@@ -479,11 +479,10 @@ with tab_setup:
                 "Max Duration": st.column_config.NumberColumn("Max", min_value=0.0, format="%.1f"),
             })
     with sub_upload:
-        st.markdown("Upload a CSV or Excel file with columns: `Label`, `Activity`, "
-                    "`Predecessors`, `Min Duration`, `Avg Duration`, `Max Duration`")
-        st.markdown("")
-        st.markdown("**Select your project file (.csv, .xlsx, .xls):**")
-        uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx", "xls"])
+        st.markdown("Upload a CSV or Excel file with the following columns:")
+        st.markdown("`Label`, `Activity`, `Predecessors`, `Min Duration`, `Avg Duration`, `Max Duration`")
+        uploaded_file = st.file_uploader(
+            "Drag and drop or browse", type=["csv", "xlsx", "xls"])
         if uploaded_file is not None:
             try:
                 if uploaded_file.name.endswith('.csv'):
@@ -496,7 +495,7 @@ with tab_setup:
                     upload_df['Predecessors'] = upload_df['Predecessors'].fillna('')
                     st.session_state.df = upload_df[list(req)].copy()
                     edited_df = st.session_state.df
-                    st.success(f"Loaded {len(upload_df)} activities")
+                    st.success(f"Loaded {len(upload_df)} activities from {uploaded_file.name}")
                     st.dataframe(upload_df, use_container_width=True, hide_index=True)
                 else:
                     st.error(f"Missing columns: {', '.join(req - set(upload_df.columns))}")
