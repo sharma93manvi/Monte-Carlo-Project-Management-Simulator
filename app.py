@@ -64,19 +64,9 @@ html, body, [class*="st-"] { font-family: 'Inter', sans-serif; }
     border-radius: 10px; padding: 1rem; margin: 0.5rem 0; font-size: 0.9rem;
 }
 div[data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
-div[data-testid="stExpander"] * {
-    -webkit-background-clip: unset !important;
-    -webkit-text-fill-color: unset !important;
-    background: none !important;
-}
-div[data-testid="stExpander"] summary span {
-    -webkit-background-clip: unset !important;
-    -webkit-text-fill-color: unset !important;
-}
 div.stButton > button[kind="primary"] {
     font-size: 1.25rem; padding: 0.85rem 2rem; letter-spacing: 0.5px;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -345,6 +335,10 @@ def compute_deterministic_schedule(topo, act_info):
 # PLOT HELPERS
 # ============================================================
 
+# ============================================================
+# PLOT HELPERS
+# ============================================================
+
 def dark_fig(figsize=(12, 5)):
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
     fig.patch.set_facecolor('#0e1117')
@@ -373,16 +367,14 @@ def draw_network_graph(act_info, topo, name_map, crit_pct=None):
         n = len(nodes)
         for i, label in enumerate(nodes):
             pos[label] = (d * 2.5, (i - (n - 1) / 2.0) * 2.0)
-    fw = max(8, (max_depth + 1) * 3)
-    fh = max(4, max_layer * 2)
-    fig, ax = plt.subplots(figsize=(fw, fh))
+    fig, ax = plt.subplots(figsize=(max(8, (max_depth+1)*3), max(4, max_layer*2)))
     fig.patch.set_facecolor('#0e1117')
     ax.set_facecolor('#0e1117')
     for label in topo:
         x1, y1 = pos[label]
         for pred in act_info[label]['preds']:
             x0, y0 = pos[pred]
-            ax.annotate("", xy=(x1 - 0.55, y1), xytext=(x0 + 0.55, y0),
+            ax.annotate("", xy=(x1-0.55, y1), xytext=(x0+0.55, y0),
                         arrowprops=dict(arrowstyle="-|>", color='#4fc3f7', lw=1.8,
                                         connectionstyle="arc3,rad=0.1"))
     for label in topo:
@@ -390,20 +382,19 @@ def draw_network_graph(act_info, topo, name_map, crit_pct=None):
         c = crit_pct.get(label, 0) if crit_pct else 0
         nc = '#ff5252' if c > 70 else '#ffd740' if c > 40 else '#4fc3f7'
         ax.add_patch(plt.Circle((x, y), 0.5, color=nc, ec='white', lw=2, zorder=3))
-        ax.text(x, y + 0.05, label, ha='center', va='center', fontsize=13,
+        ax.text(x, y+0.05, label, ha='center', va='center', fontsize=13,
                 fontweight='bold', color='white', zorder=4)
         sn = name_map.get(label, label)
-        ax.text(x, y - 0.75, sn[:16] + '..' if len(sn) > 18 else sn,
-                ha='center', va='top', fontsize=8, color='#aaa', zorder=4)
+        ax.text(x, y-0.75, sn[:16]+'..' if len(sn)>18 else sn, ha='center',
+                va='top', fontsize=8, color='#aaa', zorder=4)
         info = act_info[label]
-        ax.text(x, y + 0.72, f"[{info['min']:.0f},{info['avg']:.0f},{info['max']:.0f}]",
+        ax.text(x, y+0.72, f"[{info['min']:.0f},{info['avg']:.0f},{info['max']:.0f}]",
                 ha='center', va='bottom', fontsize=7, color='#888', zorder=4)
     xs = [p[0] for p in pos.values()]
     ys = [p[1] for p in pos.values()]
-    ax.set_xlim(min(xs) - 1.5, max(xs) + 1.5)
-    ax.set_ylim(min(ys) - 1.5, max(ys) + 1.5)
-    ax.set_aspect('equal')
-    ax.axis('off')
+    ax.set_xlim(min(xs)-1.5, max(xs)+1.5)
+    ax.set_ylim(min(ys)-1.5, max(ys)+1.5)
+    ax.set_aspect('equal'); ax.axis('off')
     ax.set_title('Project Network Diagram', color='white', fontsize=14, fontweight='bold', pad=15)
     if crit_pct:
         ax.legend(handles=[
@@ -430,16 +421,16 @@ def draw_gantt(topo, act_info, schedule, name_map, crit_pct=None):
                     height=0.45, alpha=0.15, zorder=2, linestyle='--')
         ax.barh(i, dur, left=es, color=color, edgecolor='white', height=0.55, alpha=0.88, zorder=3)
         if dur >= 1.0:
-            ax.text(es + dur / 2, i, f"{dur:.1f}w", ha='center', va='center',
+            ax.text(es + dur/2, i, f"{dur:.1f}w", ha='center', va='center',
                     fontsize=8.5, color='white', fontweight='bold', zorder=4)
         if fl > 0.8:
-            ax.text(EF[lbl] + fl / 2, i, f"+{fl:.1f}w", ha='center', va='center',
+            ax.text(EF[lbl] + fl/2, i, f"+{fl:.1f}w", ha='center', va='center',
                     fontsize=7, color=color, alpha=0.75, zorder=4)
         if crit_pct is not None:
-            ax.text(pf * 1.02, i, f"{crit:.0f}%", ha='left', va='center',
+            ax.text(pf*1.02, i, f"{crit:.0f}%", ha='left', va='center',
                     fontsize=7.5, color=color, fontweight='bold', zorder=4)
     ax.set_yticks(range(n))
-    ax.set_yticklabels([f"{l}  {name_map.get(l, l)}" for l in sorted_labels], fontsize=9.5, color='white')
+    ax.set_yticklabels([f"{l}  {name_map.get(l,l)}" for l in sorted_labels], fontsize=9.5, color='white')
     ax.invert_yaxis()
     ax.set_xlabel('Week from Project Start', color='white', fontsize=11)
     ax.set_xlim(-0.5, pf * 1.12)
@@ -457,24 +448,22 @@ def draw_gantt(topo, act_info, schedule, name_map, crit_pct=None):
 # ============================================================
 # TABS
 # ============================================================
-tab_setup, tab_dash, tab_gantt, tab_risk, tab_sched = st.tabs([
-    "Project Setup", "Dashboard", "Gantt & Timeline",
-    "Risk Analysis", "Schedule Planning"
-])
-
-# ============================================================
 # TAB 1 - PROJECT SETUP
 # ============================================================
 with tab_setup:
-    st.markdown('<div class="section-header">Project Activities</div>', unsafe_allow_html=True)
-    sub_edit, sub_upload, sub_template = st.tabs(["Edit Table", "Upload CSV/Excel", "Download Template"])
-
+    st.markdown('<div class="section-header">Project Activities</div>',
+                unsafe_allow_html=True)
+    sub_edit, sub_upload, sub_template = st.tabs([
+        "Edit Table", "Upload CSV/Excel", "Download Template"
+    ])
     with sub_edit:
-        st.markdown("Edit the table below. Use comma-separated labels for predecessors (e.g., `C,D`).")
+        st.markdown("Edit the table below. Use comma-separated labels "
+                    "for predecessors (e.g., `C,D`).")
         if 'df' not in st.session_state:
             st.session_state.df = pd.DataFrame(DEFAULT_DATA)
         edited_df = st.data_editor(
-            st.session_state.df, num_rows="dynamic", use_container_width=True, key="activity_table",
+            st.session_state.df, num_rows="dynamic",
+            use_container_width=True, key="activity_table",
             column_config={
                 "Label": st.column_config.TextColumn("Label", width="small"),
                 "Activity": st.column_config.TextColumn("Activity Name", width="medium"),
@@ -483,15 +472,20 @@ with tab_setup:
                 "Avg Duration": st.column_config.NumberColumn("Avg (Mode)", min_value=0.0, format="%.1f"),
                 "Max Duration": st.column_config.NumberColumn("Max", min_value=0.0, format="%.1f"),
             })
-
     with sub_upload:
         st.markdown("Upload a CSV or Excel file with columns: `Label`, `Activity`, "
                     "`Predecessors`, `Min Duration`, `Avg Duration`, `Max Duration`")
+        st.markdown("")
+        st.markdown("**Select your project file (.csv, .xlsx, .xls):**")
         uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx", "xls"])
         if uploaded_file is not None:
             try:
-                upload_df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
-                req = {'Label', 'Activity', 'Predecessors', 'Min Duration', 'Avg Duration', 'Max Duration'}
+                if uploaded_file.name.endswith('.csv'):
+                    upload_df = pd.read_csv(uploaded_file)
+                else:
+                    upload_df = pd.read_excel(uploaded_file)
+                req = {'Label', 'Activity', 'Predecessors',
+                       'Min Duration', 'Avg Duration', 'Max Duration'}
                 if req.issubset(set(upload_df.columns)):
                     upload_df['Predecessors'] = upload_df['Predecessors'].fillna('')
                     st.session_state.df = upload_df[list(req)].copy()
@@ -502,7 +496,6 @@ with tab_setup:
                     st.error(f"Missing columns: {', '.join(req - set(upload_df.columns))}")
             except Exception as e:
                 st.error(f"Error reading file: {e}")
-
     with sub_template:
         st.markdown("Download a template pre-filled with the Computer Design project.")
         tpl = pd.DataFrame(DEFAULT_DATA)
@@ -525,13 +518,13 @@ with tab_setup:
     with st.expander("Distribution Reference"):
         for d, desc in DIST_DESCRIPTIONS.items():
             st.markdown(f"- **{d}**: {desc}")
-
     with st.expander("Export current table as CSV"):
         st.download_button("Download table", data=edited_df.to_csv(index=False).encode(),
                            file_name="project_activities.csv", mime="text/csv")
 
 
-# RUN SIMULATION
+# RUN SIMULATION (triggered from sidebar)
+# ============================================================
 if run_button:
     errors = validate_data(edited_df)
     if errors:
@@ -544,30 +537,36 @@ if run_button:
             act_info = {}
             for _, row in edited_df.iterrows():
                 label = str(row['Label']).strip()
-                preds = [p.strip() for p in str(row.get('Predecessors', '')).split(',')
+                preds = [p.strip() for p in str(row.get('Predecessors','')).split(',')
                          if p.strip() and p.strip() != 'nan']
                 act_info[label] = {'preds': preds, 'min': float(row['Min Duration']),
                                    'avg': float(row['Avg Duration']), 'max': float(row['Max Duration'])}
-            name_map = {str(r['Label']).strip(): str(r['Activity']).strip() for _, r in edited_df.iterrows()}
+            name_map = {str(row['Label']).strip(): str(row['Activity']).strip()
+                        for _, row in edited_df.iterrows()}
             rng = np.random.default_rng(seed if seed > 0 else None)
             with st.spinner("Running simulation..."):
-                pd_arr, ad, ac = run_simulation(topo, act_info, rng, dist_type, num_simulations)
-            sched = compute_deterministic_schedule(topo, act_info)
-            cp = {l: ac[l] / num_simulations * 100 for l in topo}
-            st.session_state.sim_results = {'project_durations': pd_arr, 'activity_durations': ad, 'activity_on_critical': ac}
+                proj_dur, act_dur, act_crit = run_simulation(topo, act_info, rng, dist_type, num_simulations)
+            schedule = compute_deterministic_schedule(topo, act_info)
+            crit_pct = {l: act_crit[l] / num_simulations * 100 for l in topo}
+            # Store in session state
+            st.session_state.sim_results = {'project_durations': proj_dur, 'activity_durations': act_dur,
+                                            'activity_on_critical': act_crit}
             st.session_state.sim_topo = topo
             st.session_state.sim_act_info = act_info
             st.session_state.sim_name_map = name_map
-            st.session_state.sim_schedule = sched
-            st.session_state.sim_crit_pct = cp
+            st.session_state.sim_schedule = schedule
+            st.session_state.sim_crit_pct = crit_pct
             st.session_state.sim_dist_type = dist_type
             st.session_state.sim_n = num_simulations
             st.rerun()
 
+# Convenience aliases
 sim = st.session_state.sim_results
 
 
-# TAB 2 - DASHBOARD
+# ============================================================
+# TAB 2 — DASHBOARD
+# ============================================================
 with tab_dash:
     if sim is None:
         st.info("Run the simulation from the sidebar to see the dashboard.")
@@ -580,45 +579,87 @@ with tab_dash:
         crit_pct = st.session_state.sim_crit_pct
         n_sim = st.session_state.sim_n
         dt = st.session_state.sim_dist_type
-        mean_d = float(np.mean(proj_dur))
-        std_d = float(np.std(proj_dur))
-        med_d = float(np.median(proj_dur))
-        p_sl = float(np.percentile(proj_dur, service_level))
-        cv = (std_d / mean_d * 100) if mean_d > 0 else 0
-        ppf = schedule['project_finish']
-        hc = '#69f0ae' if cv < 5 else '#ffd740' if cv < 10 else '#ff5252'
-        ht = 'Low Risk' if cv < 5 else 'Moderate Risk' if cv < 10 else 'High Risk'
-        st.markdown(f'<div style="text-align:center;margin-bottom:1rem;"><span style="font-size:1.3rem;font-weight:700;color:{hc};">Schedule Risk: {ht}</span><span style="color:#888;font-size:0.95rem;margin-left:1rem;">(CV={cv:.1f}%)</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="insight-box">Distribution: <b>{dt}</b> | Iterations: <b>{n_sim:,}</b> | Service Level: <b>{service_level}%</b></div>', unsafe_allow_html=True)
+
+        mean_dur = float(np.mean(proj_dur))
+        std_dur = float(np.std(proj_dur))
+        median_dur = float(np.median(proj_dur))
+        p_service = float(np.percentile(proj_dur, service_level))
+        cv_pct = (std_dur / mean_dur * 100) if mean_dur > 0 else 0
+        pert_pf = schedule['project_finish']
+
+        # Health indicator
+        if cv_pct < 5:
+            hc, ht = '#69f0ae', 'Low Risk'
+        elif cv_pct < 10:
+            hc, ht = '#ffd740', 'Moderate Risk'
+        else:
+            hc, ht = '#ff5252', 'High Risk'
+
+        st.markdown(f'<div style="text-align:center;margin-bottom:1rem;">'
+                    f'<span style="font-size:1.3rem;font-weight:700;color:{hc};">Schedule Risk: {ht}</span>'
+                    f'<span style="color:#888;font-size:0.95rem;margin-left:1rem;">(CV={cv_pct:.1f}%)</span>'
+                    f'</div>', unsafe_allow_html=True)
+
+        st.markdown(f'<div class="insight-box">Distribution: <b>{dt}</b> | '
+                    f'Iterations: <b>{n_sim:,}</b> | Service Level: <b>{service_level}%</b></div>',
+                    unsafe_allow_html=True)
+
+        # Metric cards
         m1, m2, m3, m4 = st.columns(4)
-        for col, val, lbl in [(m1, mean_d, "Mean (wks)"), (m2, std_d, "Std Dev (wks)"), (m3, p_sl, f"P{service_level} (wks)"), (m4, med_d, "Median (wks)")]:
+        for col, val, lbl in [(m1, mean_dur, "Mean (wks)"), (m2, std_dur, "Std Dev (wks)"),
+                               (m3, p_service, f"P{service_level} (wks)"), (m4, median_dur, "Median (wks)")]:
             with col:
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{val:.2f}</div><div class="metric-label">{lbl}</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card"><div class="metric-value">{val:.2f}</div>'
+                            f'<div class="metric-label">{lbl}</div></div>', unsafe_allow_html=True)
+
         st.markdown("<br>", unsafe_allow_html=True)
-        cl, cr = st.columns(2)
-        with cl:
+
+        # Top Risk Activities + Schedule Scenarios side by side
+        col_l, col_r = st.columns(2)
+        with col_l:
             st.markdown("#### Top Risk Activities")
             top5 = sorted(crit_pct.items(), key=lambda x: -x[1])[:5]
-            st.dataframe(pd.DataFrame([{'Activity': f"{l} - {name_map.get(l,l)}", 'Criticality': f"{v:.0f}%", 'Level': 'High' if v>=70 else ('Medium' if v>=40 else 'Low')} for l, v in top5]), hide_index=True, use_container_width=True)
-        with cr:
+            st.dataframe(pd.DataFrame([
+                {'Activity': f"{l} - {name_map.get(l,l)}", 'Criticality': f"{v:.0f}%",
+                 'Level': 'High' if v>=70 else ('Medium' if v>=40 else 'Low')}
+                for l, v in top5
+            ]), hide_index=True, use_container_width=True)
+
+        with col_r:
             st.markdown("#### Schedule Scenarios")
             st.dataframe(pd.DataFrame([
-                {'Scenario': 'PERT Baseline', 'Duration': f"{ppf:.1f}", 'Buffer': '-'},
-                {'Scenario': 'Simulated Mean', 'Duration': f"{mean_d:.1f}", 'Buffer': f"+{mean_d-ppf:.1f}"},
-                {'Scenario': '80% Confidence', 'Duration': f"{np.percentile(proj_dur,80):.1f}", 'Buffer': f"+{np.percentile(proj_dur,80)-ppf:.1f}"},
-                {'Scenario': '90% Confidence', 'Duration': f"{np.percentile(proj_dur,90):.1f}", 'Buffer': f"+{np.percentile(proj_dur,90)-ppf:.1f}"},
-                {'Scenario': '95% Confidence', 'Duration': f"{np.percentile(proj_dur,95):.1f}", 'Buffer': f"+{np.percentile(proj_dur,95)-ppf:.1f}"},
+                {'Scenario': 'PERT Baseline', 'Duration (wks)': f"{pert_pf:.1f}", 'Buffer': '-'},
+                {'Scenario': 'Simulated Mean', 'Duration (wks)': f"{mean_dur:.1f}",
+                 'Buffer': f"+{mean_dur - pert_pf:.1f}"},
+                {'Scenario': '80% Confidence', 'Duration (wks)': f"{np.percentile(proj_dur,80):.1f}",
+                 'Buffer': f"+{np.percentile(proj_dur,80) - pert_pf:.1f}"},
+                {'Scenario': '90% Confidence', 'Duration (wks)': f"{np.percentile(proj_dur,90):.1f}",
+                 'Buffer': f"+{np.percentile(proj_dur,90) - pert_pf:.1f}"},
+                {'Scenario': '95% Confidence', 'Duration (wks)': f"{np.percentile(proj_dur,95):.1f}",
+                 'Buffer': f"+{np.percentile(proj_dur,95) - pert_pf:.1f}"},
             ]), hide_index=True, use_container_width=True)
+
         st.markdown("---")
+
+        # PERT vs MC comparison
         st.markdown("#### PERT Analytical vs Monte Carlo")
         cp = schedule['critical']
-        cp_std = np.sqrt(sum(pert_variance(act_info[l]['min'], act_info[l]['max']) for l in cp))
+        pert_cp_std = np.sqrt(sum(pert_variance(act_info[l]['min'], act_info[l]['max']) for l in cp))
         z = norm.ppf(service_level / 100)
-        pert_sl = ppf + z * cp_std
-        st.dataframe(pd.DataFrame({'Method': ['PERT (Analytical)', 'Monte Carlo'], 'Mean (wks)': [f"{ppf:.2f}", f"{mean_d:.2f}"], f'P{service_level} (wks)': [f"{pert_sl:.2f}", f"{p_sl:.2f}"], 'Std Dev (wks)': [f"{cp_std:.2f}", f"{std_d:.2f}"]}), hide_index=True, use_container_width=True)
+        pert_sl = pert_pf + z * pert_cp_std
+        st.dataframe(pd.DataFrame({
+            'Method': ['PERT (Analytical)', 'Monte Carlo'],
+            'Mean (wks)': [f"{pert_pf:.2f}", f"{mean_dur:.2f}"],
+            f'P{service_level} (wks)': [f"{pert_sl:.2f}", f"{p_service:.2f}"],
+            'Std Dev (wks)': [f"{pert_cp_std:.2f}", f"{std_dur:.2f}"],
+        }), hide_index=True, use_container_width=True)
+
         cp_str = " -> ".join([f"{l} ({name_map.get(l,l)})" for l in cp])
         st.markdown(f'<div class="insight-box">Critical Path: <b>{cp_str}</b></div>', unsafe_allow_html=True)
+
         st.markdown("---")
+
+        # Histogram
         fig, ax = dark_fig((12, 5))
         _, bins, patches = ax.hist(proj_dur, bins=60, edgecolor='none', alpha=0.85)
         cm = plt.cm.get_cmap('cool')
@@ -626,9 +667,9 @@ with tab_dash:
         cn = plt.Normalize(bc.min(), bc.max())
         for c, p in zip(bc, patches):
             p.set_facecolor(cm(cn(c)))
-        ax.axvline(mean_d, color='#ff5252', ls='--', lw=2.5, label=f'Mean={mean_d:.2f}')
-        ax.axvline(p_sl, color='#ffd740', ls='--', lw=2.5, label=f'P{service_level}={p_sl:.2f}')
-        ax.axvline(med_d, color='#69f0ae', ls=':', lw=2, label=f'Median={med_d:.2f}')
+        ax.axvline(mean_dur, color='#ff5252', ls='--', lw=2.5, label=f'Mean={mean_dur:.2f}')
+        ax.axvline(p_service, color='#ffd740', ls='--', lw=2.5, label=f'P{service_level}={p_service:.2f}')
+        ax.axvline(median_dur, color='#69f0ae', ls=':', lw=2, label=f'Median={median_dur:.2f}')
         ax.set_xlabel('Project Duration (weeks)', color='white', fontsize=12)
         ax.set_ylabel('Frequency', color='white', fontsize=12)
         ax.set_title(f'Duration Distribution ({n_sim:,} iterations, {dt})', color='white', fontsize=14, fontweight='bold')
@@ -636,11 +677,19 @@ with tab_dash:
         ax.grid(axis='y', alpha=0.15, color='white')
         plt.tight_layout()
         st.pyplot(fig); plt.close(fig)
+
         with st.expander("Full Summary Statistics"):
-            st.dataframe(pd.DataFrame({'Statistic': ['Mean','Std Dev','Min','P25','Median','P75',f'P{service_level}','Max'], 'Weeks': [f"{mean_d:.2f}",f"{std_d:.2f}",f"{np.min(proj_dur):.2f}",f"{np.percentile(proj_dur,25):.2f}",f"{med_d:.2f}",f"{np.percentile(proj_dur,75):.2f}",f"{p_sl:.2f}",f"{np.max(proj_dur):.2f}"]}), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame({
+                'Statistic': ['Mean','Std Dev','Min','P25','Median','P75',f'P{service_level}','Max'],
+                'Weeks': [f"{mean_dur:.2f}", f"{std_dur:.2f}", f"{np.min(proj_dur):.2f}",
+                          f"{np.percentile(proj_dur,25):.2f}", f"{median_dur:.2f}",
+                          f"{np.percentile(proj_dur,75):.2f}", f"{p_service:.2f}", f"{np.max(proj_dur):.2f}"]
+            }), hide_index=True, use_container_width=True)
 
 
-# TAB 3 - GANTT & TIMELINE
+# ============================================================
+# TAB 3 — GANTT & TIMELINE
+# ============================================================
 with tab_gantt:
     if sim is None:
         st.info("Run the simulation from the sidebar to see the Gantt chart.")
@@ -650,102 +699,155 @@ with tab_gantt:
         name_map = st.session_state.sim_name_map
         schedule = st.session_state.sim_schedule
         crit_pct = st.session_state.sim_crit_pct
+
         st.markdown('<div class="section-header">Gantt Chart</div>', unsafe_allow_html=True)
-        st.markdown('<div class="insight-box">Bars = mean duration (ES to EF). Dashed = float/slack. Color = criticality.</div>', unsafe_allow_html=True)
-        fg = draw_gantt(topo, act_info, schedule, name_map, crit_pct)
-        st.pyplot(fg); plt.close(fg)
+        st.markdown('<div class="insight-box">Bars = mean duration (ES to EF). Dashed = float/slack. '
+                    'Color = criticality. Percentage = criticality index.</div>', unsafe_allow_html=True)
+        fig_g = draw_gantt(topo, act_info, schedule, name_map, crit_pct)
+        st.pyplot(fig_g); plt.close(fig_g)
+
         st.markdown("---")
         st.markdown('<div class="section-header">Schedule Table</div>', unsafe_allow_html=True)
-        rows = []
+        sched_rows = []
         for lbl in topo:
-            rows.append({'Label': lbl, 'Activity': name_map.get(lbl, lbl), 'PERT Mean': f"{schedule['mean_dur'][lbl]:.2f}", 'ES': f"{schedule['ES'][lbl]:.2f}", 'EF': f"{schedule['EF'][lbl]:.2f}", 'LS': f"{schedule['LS'][lbl]:.2f}", 'LF': f"{schedule['LF'][lbl]:.2f}", 'Float': f"{schedule['slack'][lbl]:.2f}", 'Critical': 'Yes' if lbl in schedule['critical'] else '', 'Crit%': f"{crit_pct[lbl]:.1f}%"})
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+            sched_rows.append({
+                'Label': lbl, 'Activity': name_map.get(lbl, lbl),
+                'PERT Mean': f"{schedule['mean_dur'][lbl]:.2f}",
+                'ES': f"{schedule['ES'][lbl]:.2f}", 'EF': f"{schedule['EF'][lbl]:.2f}",
+                'LS': f"{schedule['LS'][lbl]:.2f}", 'LF': f"{schedule['LF'][lbl]:.2f}",
+                'Float': f"{schedule['slack'][lbl]:.2f}",
+                'Critical': 'Yes' if lbl in schedule['critical'] else '',
+                'Criticality': f"{crit_pct[lbl]:.1f}%",
+            })
+        st.dataframe(pd.DataFrame(sched_rows), hide_index=True, use_container_width=True)
+
         st.markdown("---")
         st.markdown('<div class="section-header">Network Diagram</div>', unsafe_allow_html=True)
-        fn = draw_network_graph(act_info, topo, name_map, crit_pct)
-        st.pyplot(fn); plt.close(fn)
+        fig_n = draw_network_graph(act_info, topo, name_map, crit_pct)
+        st.pyplot(fig_n); plt.close(fig_n)
 
-# TAB 4 - RISK ANALYSIS
+
+# ============================================================
+# TAB 4 — RISK ANALYSIS
+# ============================================================
 with tab_risk:
     if sim is None:
         st.info("Run the simulation from the sidebar to see risk analysis.")
     else:
         proj_dur = sim['project_durations']
         act_dur = sim['activity_durations']
+        act_crit = sim['activity_on_critical']
         topo = st.session_state.sim_topo
         act_info = st.session_state.sim_act_info
         name_map = st.session_state.sim_name_map
         crit_pct = st.session_state.sim_crit_pct
+        n_sim = st.session_state.sim_n
+
+        # Criticality Index
         st.markdown('<div class="section-header">Activity Criticality Index</div>', unsafe_allow_html=True)
-        crit_df = pd.DataFrame([{'Label': l, 'Activity': name_map.get(l,l), 'Crit': crit_pct[l]} for l in topo]).sort_values('Crit', ascending=True)
+        st.markdown('<div class="insight-box">How often each activity appears on the critical path.</div>',
+                    unsafe_allow_html=True)
+        crit_df = pd.DataFrame([{'Label': l, 'Activity': name_map.get(l,l), 'Criticality (%)': crit_pct[l]}
+                                 for l in topo]).sort_values('Criticality (%)', ascending=True)
         fig3, ax3 = dark_fig((10, max(3, len(topo)*0.6)))
-        colors = ['#ff5252' if v>70 else '#ffd740' if v>40 else '#69f0ae' for v in crit_df['Crit']]
-        bars = ax3.barh([f"{r['Label']}: {r['Activity']}" for _,r in crit_df.iterrows()], crit_df['Crit'], color=colors, edgecolor='none', height=0.6)
-        for bar, val in zip(bars, crit_df['Crit']):
-            ax3.text(bar.get_width()+1, bar.get_y()+bar.get_height()/2, f'{val:.1f}%', va='center', color='white', fontsize=10)
+        colors = ['#ff5252' if v>70 else '#ffd740' if v>40 else '#69f0ae' for v in crit_df['Criticality (%)']]
+        bars = ax3.barh([f"{r['Label']}: {r['Activity']}" for _,r in crit_df.iterrows()],
+                        crit_df['Criticality (%)'], color=colors, edgecolor='none', height=0.6)
+        for bar, val in zip(bars, crit_df['Criticality (%)']):
+            ax3.text(bar.get_width()+1, bar.get_y()+bar.get_height()/2, f'{val:.1f}%',
+                     va='center', color='white', fontsize=10)
         ax3.set_xlabel('Criticality Index (%)', color='white', fontsize=12)
         ax3.set_title('Critical Path Frequency', color='white', fontsize=14, fontweight='bold')
         ax3.set_xlim(0, 110); ax3.grid(axis='x', alpha=0.15, color='white')
         plt.tight_layout(); st.pyplot(fig3); plt.close(fig3)
+
         st.markdown("---")
-        st.markdown('<div class="section-header">Tornado Chart</div>', unsafe_allow_html=True)
+
+        # Tornado
+        st.markdown('<div class="section-header">Tornado Chart — Duration Sensitivity</div>', unsafe_allow_html=True)
+        st.markdown('<div class="insight-box">Spearman correlation between each activity duration and project duration.</div>',
+                    unsafe_allow_html=True)
         corrs = []
         for label in topo:
             c, _ = sp_stats.spearmanr(act_dur[label], proj_dur)
-            corrs.append({'Label': label, 'Activity': name_map.get(label,label), 'Corr': c if not np.isnan(c) else 0.0})
-        corr_df = pd.DataFrame(corrs).sort_values('Corr', key=abs, ascending=True)
+            corrs.append({'Label': label, 'Activity': name_map.get(label,label),
+                          'Correlation': c if not np.isnan(c) else 0.0})
+        corr_df = pd.DataFrame(corrs).sort_values('Correlation', key=abs, ascending=True)
         fig4, ax4 = dark_fig((10, max(3, len(topo)*0.6)))
-        bcolors = ['#ff5252' if v>0 else '#4fc3f7' for v in corr_df['Corr']]
-        ax4.barh([f"{r['Label']}: {r['Activity']}" for _,r in corr_df.iterrows()], corr_df['Corr'], color=bcolors, edgecolor='none', height=0.6)
+        bc = ['#ff5252' if v>0 else '#4fc3f7' for v in corr_df['Correlation']]
+        ax4.barh([f"{r['Label']}: {r['Activity']}" for _,r in corr_df.iterrows()],
+                 corr_df['Correlation'], color=bc, edgecolor='none', height=0.6)
         for i, (_,r) in enumerate(corr_df.iterrows()):
-            off = 0.02 if r['Corr']>=0 else -0.02
-            ax4.text(r['Corr']+off, i, f"{r['Corr']:.3f}", va='center', ha='left' if r['Corr']>=0 else 'right', color='white', fontsize=9)
+            off = 0.02 if r['Correlation']>=0 else -0.02
+            ax4.text(r['Correlation']+off, i, f"{r['Correlation']:.3f}", va='center',
+                     ha='left' if r['Correlation']>=0 else 'right', color='white', fontsize=9)
         ax4.axvline(0, color='#555', lw=1)
         ax4.set_xlabel('Spearman Correlation', color='white', fontsize=12)
-        ax4.set_title('Duration Sensitivity', color='white', fontsize=14, fontweight='bold')
+        ax4.set_title('Activity Duration Sensitivity', color='white', fontsize=14, fontweight='bold')
         ax4.grid(axis='x', alpha=0.15, color='white')
         plt.tight_layout(); st.pyplot(fig4); plt.close(fig4)
+
         st.markdown("---")
+
+        # Box Plots
         st.markdown('<div class="section-header">Activity Duration Box Plots</div>', unsafe_allow_html=True)
         fig5, ax5 = dark_fig((12, max(4, len(topo)*0.55)))
-        ax5.boxplot([act_dur[l] for l in topo], vert=False, labels=[f"{l}: {name_map.get(l,l)}" for l in topo], patch_artist=True, widths=0.5, boxprops=dict(facecolor='#1a1a2e', edgecolor='#4fc3f7', lw=1.5), whiskerprops=dict(color='#4fc3f7', lw=1.2), capprops=dict(color='#4fc3f7', lw=1.2), medianprops=dict(color='#ff5252', lw=2), flierprops=dict(marker='o', markerfacecolor='#ffd740', markeredgecolor='none', markersize=3, alpha=0.5))
+        bp = ax5.boxplot([act_dur[l] for l in topo], vert=False,
+                         labels=[f"{l}: {name_map.get(l,l)}" for l in topo], patch_artist=True, widths=0.5,
+                         boxprops=dict(facecolor='#1a1a2e', edgecolor='#4fc3f7', lw=1.5),
+                         whiskerprops=dict(color='#4fc3f7', lw=1.2), capprops=dict(color='#4fc3f7', lw=1.2),
+                         medianprops=dict(color='#ff5252', lw=2),
+                         flierprops=dict(marker='o', markerfacecolor='#ffd740', markeredgecolor='none', markersize=3, alpha=0.5))
         ax5.set_xlabel('Duration (weeks)', color='white', fontsize=12)
         ax5.set_title('Sampled Duration Distributions', color='white', fontsize=14, fontweight='bold')
         ax5.tick_params(axis='y', colors='white'); ax5.grid(axis='x', alpha=0.15, color='white')
         plt.tight_layout(); st.pyplot(fig5); plt.close(fig5)
+
         st.markdown("---")
+
+        # Activity Risk Profile
         st.markdown('<div class="section-header">Activity Risk Profile</div>', unsafe_allow_html=True)
-        rr = []
+        risk_rows = []
         for label in topo:
             info = act_info[label]
             md = pert_mean(info['min'], info['avg'], info['max'])
             unc = info['max'] - info['min']
             cv = (unc/6.0)/md*100 if md>0 else 0
             crit = crit_pct[label]
-            rating = 'High' if crit>=70 or (crit>=30 and cv>=20) else 'Medium' if crit>=30 or cv>=15 else 'Low'
-            rr.append({'Label': label, 'Activity': name_map.get(label,label), 'Mean': f"{md:.2f}", 'Range': f"{unc:.1f}", 'CV%': f"{cv:.1f}", 'Crit%': f"{crit:.1f}", 'Risk': rating})
-        st.dataframe(pd.DataFrame(rr), hide_index=True, use_container_width=True)
+            rating = 'High' if crit>=70 or (crit>=30 and cv>=20) else ('Medium' if crit>=30 or cv>=15 else 'Low')
+            risk_rows.append({'Label': label, 'Activity': name_map.get(label,label),
+                              'Mean (wks)': f"{md:.2f}", 'Range (wks)': f"{unc:.1f}",
+                              'CV (%)': f"{cv:.1f}", 'Criticality (%)': f"{crit:.1f}", 'Risk': rating})
+        st.dataframe(pd.DataFrame(risk_rows), hide_index=True, use_container_width=True)
 
 
-# TAB 5 - SCHEDULE PLANNING
+# ============================================================
+# TAB 5 — SCHEDULE PLANNING
+# ============================================================
 with tab_sched:
     if sim is None:
         st.info("Run the simulation from the sidebar to see schedule planning.")
     else:
         proj_dur = sim['project_durations']
+        topo = st.session_state.sim_topo
+        act_info = st.session_state.sim_act_info
         schedule = st.session_state.sim_schedule
         n_sim = st.session_state.sim_n
         dt = st.session_state.sim_dist_type
-        ppf = schedule['project_finish']
-        mean_d = float(np.mean(proj_dur))
-        p_sl = float(np.percentile(proj_dur, service_level))
+        pert_pf = schedule['project_finish']
+        mean_dur = float(np.mean(proj_dur))
+        p_service = float(np.percentile(proj_dur, service_level))
+
+        # S-Curve
         st.markdown('<div class="section-header">Cumulative Probability (S-Curve)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="insight-box">Probability of completing the project within a given number of weeks.</div>',
+                    unsafe_allow_html=True)
         fig2, ax2 = dark_fig((12, 5))
         sd = np.sort(proj_dur)
         cum = np.arange(1, len(sd)+1)/len(sd)*100
         ax2.plot(sd, cum, color='#4fc3f7', lw=2.5)
-        ax2.axhline(service_level, color='#ffd740', ls='--', lw=1.5, label=f'{service_level}% -> {p_sl:.2f}')
-        ax2.axvline(p_sl, color='#ffd740', ls='--', lw=1.5)
+        ax2.axhline(service_level, color='#ffd740', ls='--', lw=1.5, label=f'{service_level}% -> {p_service:.2f}')
+        ax2.axvline(p_service, color='#ffd740', ls='--', lw=1.5)
         ax2.axhline(50, color='#69f0ae', ls=':', lw=1.2, label=f'50% -> {np.median(proj_dur):.2f}')
         ax2.fill_between(sd, cum, alpha=0.08, color='#4fc3f7')
         ax2.set_xlabel('Project Duration (weeks)', color='white', fontsize=12)
@@ -755,40 +857,82 @@ with tab_sched:
         ax2.yaxis.set_major_formatter(mticker.PercentFormatter())
         ax2.grid(alpha=0.15, color='white')
         plt.tight_layout(); st.pyplot(fig2); plt.close(fig2)
+
         st.markdown("---")
+
+        # Buffer Chart
         st.markdown('<div class="section-header">Schedule Contingency Buffer</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="insight-box">Baseline (PERT) = <b>{ppf:.1f} weeks</b>. Buffer needed at each confidence level.</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="insight-box">Baseline (PERT mean) = <b>{pert_pf:.1f} weeks</b>. '
+                    f'Buffer needed above baseline at each confidence level.</div>', unsafe_allow_html=True)
         pcts = [50,60,70,75,80,85,90,95,97,99]
-        buffers = [max(0.0, float(np.percentile(proj_dur, p)) - ppf) for p in pcts]
+        buffers = [max(0.0, float(np.percentile(proj_dur, p)) - pert_pf) for p in pcts]
         fig6, ax6 = dark_fig((10, 4.5))
-        bcc = ['#ff5252' if p>=90 else '#ffd740' if p>=75 else '#4fc3f7' for p in pcts]
-        bb = ax6.bar([f"{p}%" for p in pcts], buffers, color=bcc, edgecolor='none', width=0.6)
+        buf_colors = ['#ff5252' if p>=90 else '#ffd740' if p>=75 else '#4fc3f7' for p in pcts]
+        bb = ax6.bar([f"{p}%" for p in pcts], buffers, color=buf_colors, edgecolor='none', width=0.6)
         for bar, val in zip(bb, buffers):
-            ax6.text(bar.get_x()+bar.get_width()/2, bar.get_height()+0.1, f"{val:.1f}w", ha='center', va='bottom', color='white', fontsize=9)
+            ax6.text(bar.get_x()+bar.get_width()/2, bar.get_height()+0.1, f"{val:.1f}w",
+                     ha='center', va='bottom', color='white', fontsize=9)
         ax6.set_xlabel('Confidence Level', color='white', fontsize=12)
         ax6.set_ylabel('Buffer (weeks)', color='white', fontsize=12)
-        ax6.set_title(f'Contingency Buffer (above {ppf:.1f} wk baseline)', color='white', fontsize=13, fontweight='bold')
+        ax6.set_title(f'Contingency Buffer (above {pert_pf:.1f} wk baseline)', color='white', fontsize=13, fontweight='bold')
         ax6.grid(axis='y', alpha=0.15, color='white')
         plt.tight_layout(); st.pyplot(fig6); plt.close(fig6)
-        st.dataframe(pd.DataFrame({'Confidence': [f"{p}%" for p in pcts], 'Completion (wks)': [f"{np.percentile(proj_dur,p):.1f}" for p in pcts], 'Buffer (wks)': [f"{b:.1f}" for b in buffers]}), hide_index=True, use_container_width=True)
+
+        st.dataframe(pd.DataFrame({
+            'Confidence': [f"{p}%" for p in pcts],
+            'Completion (wks)': [f"{np.percentile(proj_dur,p):.1f}" for p in pcts],
+            'Buffer (wks)': [f"{b:.1f}" for b in buffers],
+        }), hide_index=True, use_container_width=True)
+
         st.markdown("---")
+
+        # Completion Probability Lookup
         st.markdown('<div class="section-header">Completion Probability Lookup</div>', unsafe_allow_html=True)
         tc1, tc2 = st.columns([1, 2])
         with tc1:
-            tw = st.number_input("Target completion (weeks)", min_value=float(np.floor(np.min(proj_dur))), max_value=float(np.ceil(np.max(proj_dur)))+10, value=float(round(p_sl, 1)), step=0.5)
+            target_week = st.number_input("Target completion (weeks)",
+                                          min_value=float(np.floor(np.min(proj_dur))),
+                                          max_value=float(np.ceil(np.max(proj_dur)))+10,
+                                          value=float(round(p_service, 1)), step=0.5)
         with tc2:
-            prob = np.mean(proj_dur <= tw) * 100
-            clr = '#69f0ae' if prob>=90 else '#ffd740' if prob>=50 else '#ff5252'
-            adv = "Very safe deadline." if prob>=90 else "Moderate confidence. Consider buffer." if prob>=50 else "Low confidence. Add contingency."
-            st.markdown(f'<div class="metric-card" style="margin-top:0.5rem;"><div class="metric-value" style="color:{clr};">{prob:.1f}%</div><div class="metric-label">P(finish by week {tw:.1f})</div></div>', unsafe_allow_html=True)
-            st.markdown(f'<p style="color:{clr};font-size:0.9rem;margin-top:0.5rem;">{adv}</p>', unsafe_allow_html=True)
+            prob = np.mean(proj_dur <= target_week) * 100
+            color = '#69f0ae' if prob>=90 else '#ffd740' if prob>=50 else '#ff5252'
+            advice = ("Very safe deadline." if prob>=90
+                      else "Moderate confidence. Consider buffer." if prob>=50
+                      else "Low confidence. Add contingency or compress scope.")
+            st.markdown(f'<div class="metric-card" style="margin-top:0.5rem;">'
+                        f'<div class="metric-value" style="color:{color};">{prob:.1f}%</div>'
+                        f'<div class="metric-label">P(finish by week {target_week:.1f})</div></div>',
+                        unsafe_allow_html=True)
+            st.markdown(f'<p style="color:{color};font-size:0.9rem;margin-top:0.5rem;">{advice}</p>',
+                        unsafe_allow_html=True)
+
         st.markdown("---")
+
+        # Percentile Table
         st.markdown('<div class="section-header">Percentile Lookup Table</div>', unsafe_allow_html=True)
-        st.dataframe(pd.DataFrame([{'Service Level': f"{p}%", 'Completion (wks)': f"{np.percentile(proj_dur,p):.1f}"} for p in [50,60,70,75,80,85,90,95,97,99]]), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame([{'Service Level': f"{p}%", 'Completion (wks)': f"{np.percentile(proj_dur,p):.1f}"}
+                                    for p in [50,60,70,75,80,85,90,95,97,99]]),
+                     hide_index=True, use_container_width=True)
+
         st.markdown("---")
+
+        # Export
         st.markdown('<div class="section-header">Export Results</div>', unsafe_allow_html=True)
         e1, e2 = st.columns(2)
         with e1:
-            st.download_button("Download Raw Simulation (CSV)", data=pd.DataFrame({'Duration (wks)': proj_dur}).to_csv(index=False), file_name="simulation_raw.csv", mime="text/csv", use_container_width=True)
+            st.download_button("Download Raw Simulation (CSV)",
+                               data=pd.DataFrame({'Duration (wks)': proj_dur}).to_csv(index=False),
+                               file_name="simulation_raw.csv", mime="text/csv", use_container_width=True)
         with e2:
-            st.download_button("Download Summary (CSV)", data=pd.DataFrame([{'Metric': 'Distribution', 'Value': dt}, {'Metric': 'Iterations', 'Value': n_sim}, {'Metric': 'Mean (wks)', 'Value': f"{mean_d:.2f}"}, {'Metric': 'Std Dev (wks)', 'Value': f"{np.std(proj_dur):.2f}"}, {'Metric': 'Baseline (wks)', 'Value': f"{ppf:.2f}"}, {'Metric': f'P{service_level} (wks)', 'Value': f"{p_sl:.2f}"}]).to_csv(index=False), file_name="simulation_summary.csv", mime="text/csv", use_container_width=True)
+            st.download_button("Download Summary (CSV)",
+                               data=pd.DataFrame([
+                                   {'Metric': 'Distribution', 'Value': dt},
+                                   {'Metric': 'Iterations', 'Value': n_sim},
+                                   {'Metric': 'Mean (wks)', 'Value': f"{mean_dur:.2f}"},
+                                   {'Metric': 'Std Dev (wks)', 'Value': f"{np.std(proj_dur):.2f}"},
+                                   {'Metric': 'PERT Baseline (wks)', 'Value': f"{pert_pf:.2f}"},
+                                   {'Metric': f'P{service_level} (wks)', 'Value': f"{p_service:.2f}"},
+                               ]).to_csv(index=False),
+                               file_name="simulation_summary.csv", mime="text/csv", use_container_width=True)
+
